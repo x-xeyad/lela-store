@@ -19,15 +19,19 @@ const mapOrderFromDb = (o) => {
 
 const mapOrderToDb = (o) => {
   if (!o) return null;
+  const totalEGP = o.totalEGP || 0;
+  const exchangeRate = o.exchangeRate || 11.5;
+  const totalYER = o.totalYER !== undefined && o.totalYER !== null ? o.totalYER : (totalEGP * exchangeRate);
+
   return {
     id: o.id,
     customer: o.customer,
     items: o.items,
-    total_egp: o.totalEGP,
-    total_yer: o.totalYER,
-    selected_currency: o.selectedCurrency,
-    exchange_rate: o.exchangeRate,
-    status: o.status,
+    total_egp: totalEGP,
+    total_yer: totalYER,
+    selected_currency: o.selectedCurrency || "YER",
+    exchange_rate: exchangeRate,
+    status: o.status || "pending",
     coupon_code: o.couponCode || null,
     discount_amount: o.discountAmount || 0,
     created_at: o.createdAt
