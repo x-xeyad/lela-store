@@ -543,16 +543,12 @@ export const Admin = () => {
   // SPECIAL ORDERS SOURCING OPERATIONS
   const handleUpdateSpecialOrderStatus = async (id, status) => {
     try {
-      const list = await settingsService.getSpecialOrders();
-      const idx = list.findIndex(so => so.id === id);
-      if (idx !== -1) {
-        list[idx].status = status;
-        await settingsService.saveSpecialOrders(list);
-        await settingsService.addActivityLog(`Special Order ID ${id} status updated to ${status}`);
-        toast.success("Special order status updated.");
-        loadData();
-      }
+      await settingsService.updateSpecialOrderStatus(id, status);
+      await settingsService.addActivityLog(`Special Order ID ${id} status updated to ${status}`);
+      toast.success("Special order status updated.");
+      loadData();
     } catch (e) {
+      console.error(e);
       toast.error("Failed to update status.");
     }
   };
@@ -560,13 +556,12 @@ export const Admin = () => {
   const handleDeleteSpecialOrder = async (id) => {
     if (window.confirm("Delete special request?")) {
       try {
-        const list = await settingsService.getSpecialOrders();
-        const filtered = list.filter(so => so.id !== id);
-        await settingsService.saveSpecialOrders(filtered);
+        await settingsService.deleteSpecialOrder(id);
         await settingsService.addActivityLog(`Special Order ID ${id} deleted`);
         toast.success("Special request deleted.");
         loadData();
       } catch (e) {
+        console.error(e);
         toast.error("Failed to delete special request.");
       }
     }

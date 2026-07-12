@@ -413,7 +413,7 @@ export const settingsService = {
             customer: so.customer,
             description: so.description,
             weight: so.weight,
-            image_url: so.imageUrl,
+            image_url: so.imageUrl || so.image_url,
             status: so.status
           })));
           
@@ -422,6 +422,71 @@ export const settingsService = {
       return specialOrders;
     } catch (e) {
       console.error("Exception in saveSpecialOrders:", e);
+      throw e;
+    }
+  },
+
+  createSpecialOrder: async (so) => {
+    try {
+      const { data, error } = await supabase
+        .from("special_orders")
+        .insert([{
+          id: so.id,
+          date: so.date,
+          customer: so.customer,
+          description: so.description,
+          weight: so.weight,
+          image_url: so.imageUrl || so.image_url || "",
+          status: so.status || "pending"
+        }])
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase createSpecialOrder error:", error.message);
+        throw error;
+      }
+      return data;
+    } catch (e) {
+      console.error("Exception in createSpecialOrder:", e);
+      throw e;
+    }
+  },
+
+  updateSpecialOrderStatus: async (id, status) => {
+    try {
+      const { data, error } = await supabase
+        .from("special_orders")
+        .update({ status })
+        .eq("id", id)
+        .select()
+        .single();
+
+      if (error) {
+        console.error("Supabase updateSpecialOrderStatus error:", error.message);
+        throw error;
+      }
+      return data;
+    } catch (e) {
+      console.error("Exception in updateSpecialOrderStatus:", e);
+      throw e;
+    }
+  },
+
+  deleteSpecialOrder: async (id) => {
+    try {
+      const { error } = await supabase
+        .from("special_orders")
+        .delete()
+        .eq("id", id);
+
+      if (error) {
+        console.error("Supabase deleteSpecialOrder error:", error.message);
+        throw error;
+      }
+      return true;
+    } catch (e) {
+      console.error("Exception in deleteSpecialOrder:", e);
       throw e;
     }
   },

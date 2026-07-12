@@ -35,7 +35,6 @@ export const SpecialOrderModal = ({ isOpen, onClose }) => {
     setLoading(true);
     try {
       // 1. Log request inside admin database
-      const specialOrders = await settingsService.getSpecialOrders();
       const newRequest = {
         id: "so_" + Date.now(),
         customer: {
@@ -49,8 +48,7 @@ export const SpecialOrderModal = ({ isOpen, onClose }) => {
         date: new Date().toISOString().split("T")[0]
       };
 
-      specialOrders.push(newRequest);
-      await settingsService.saveSpecialOrders(specialOrders);
+      await settingsService.createSpecialOrder(newRequest);
       await settingsService.addActivityLog(`Special Sourcing Request from ${formData.name} logged`);
 
       // 2. Format WhatsApp Message
