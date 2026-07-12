@@ -2,6 +2,7 @@ import React, { createContext, useContext, useState, useEffect } from "react";
 import { settingsService } from "../services/settingsService";
 import logoLight from "../assets/logo_light.png";
 import logoDark from "../assets/logo_dark.png";
+import { supabase } from "../services/supabaseClient";
 
 const ThemeContext = createContext();
 
@@ -30,6 +31,21 @@ export const ThemeProvider = ({ children }) => {
 
   useEffect(() => {
     loadThemeSettings();
+
+    const settingsSubscription = supabase
+      .channel("realtime-settings")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "settings" },
+        () => {
+          loadThemeSettings();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(settingsSubscription);
+    };
   }, []);
 
   useEffect(() => {

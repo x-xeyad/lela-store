@@ -3,6 +3,7 @@ import { useSearchParams } from "react-router-dom";
 import { productService } from "../services/productService";
 import { settingsService } from "../services/settingsService";
 import { useLanguage } from "../context/LanguageContext";
+import { supabase } from "../services/supabaseClient";
 import { ProductCard } from "../components/ProductCard";
 import { SkeletonCard } from "../components/SkeletonCard";
 import { QuickViewModal } from "../components/QuickViewModal";
@@ -29,37 +30,54 @@ export const Shop = () => {
 
   const [categories, setCategories] = useState([{ id: "all", name: { en: "All", ar: "الكل" } }]);
 
-  // Load products and parse category from query param
-  useEffect(() => {
-    const loadProducts = async () => {
-      setLoading(true);
-      try {
-        const data = await productService.getAll();
-        setProducts(data);
+  const loadProducts = async () => {
+    setLoading(true);
+    try {
+      const data = await productService.getAll();
+      setProducts(data);
 
-        const settings = await settingsService.get();
-        const dbCategories = settings.categories || [];
-        const activeCategories = [
-          { id: "all", name: { en: "All", ar: "الكل" } },
-          ...dbCategories.filter(c => !c.hidden).sort((a,b) => (a.order || 0) - (b.order || 0))
-        ];
-        setCategories(activeCategories);
-        
-        // Check query params
-        const catParam = searchParams.get("category");
-        if (catParam && activeCategories.some(c => c.name.en === catParam)) {
-          setSelectedCategory(catParam);
-        } else {
-          setSelectedCategory("All");
-        }
-      } catch (e) {
-        console.error("Failed to load products in Shop", e);
-      } finally {
-        setLoading(false);
+      const settings = await settingsService.get();
+      const dbCategories = settings.categories || [];
+      const activeCategories = [
+        { id: "all", name: { en: "All", ar: "الكل" } },
+        ...dbCategories.filter(c => !c.hidden).sort((a,b) => (a.order || 0) - (b.order || 0))
+      ];
+      setCategories(activeCategories);
+      
+      // Check query params
+      const catParam = searchParams.get("category");
+      if (catParam && activeCategories.some(c => c.name.en === catParam)) {
+        setSelectedCategory(catParam);
+      } else {
+        setSelectedCategory("All");
       }
-    };
+    } catch (e) {
+      console.error("Failed to load products in Shop", e);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
     loadProducts();
   }, [searchParams]);
+
+  useEffect(() => {
+    const productsSubscription = supabase
+      .channel("realtime-shop-products")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => {
+          loadProducts();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(productsSubscription);
+    };
+  }, []);
 
   // Sync category state back to query params
   const handleCategorySelect = (category) => {

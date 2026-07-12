@@ -6,6 +6,7 @@ import { ProductCard } from "../components/ProductCard";
 import { ShippingCalculator } from "../components/ShippingCalculator";
 import { settingsService } from "../services/settingsService";
 import { productService } from "../services/productService";
+import { supabase } from "../services/supabaseClient";
 import { motion } from "framer-motion";
 import {
   Sparkles,
@@ -49,33 +50,64 @@ export const Home = () => {
   const [isTrackingOpen, setIsTrackingOpen] = useState(false);
   const [isSpecialOrderOpen, setIsSpecialOrderOpen] = useState(false);
 
-  useEffect(() => {
-    const loadHomeData = async () => {
-      try {
-        const settings = await settingsService.get();
-        setHomepageData(settings.homepage);
-        setFaqs(settings.faq);
-        setReviews(settings.reviews);
-        setContactInfo(settings.contactInfo);
-        setCategories(settings.categories || []);
+  const loadHomeData = async () => {
+    try {
+      const settings = await settingsService.get();
+      setHomepageData(settings.homepage);
+      setFaqs(settings.faq);
+      setReviews(settings.reviews);
+      setContactInfo(settings.contactInfo);
+      setCategories(settings.categories || []);
 
-        const products = await productService.getAll();
-        setFeaturedProducts(products.filter(p => p.featured));
+      const products = await productService.getAll();
+      setFeaturedProducts(products.filter(p => p.featured));
 
-        // Load recently viewed
-        const recentIdsRaw = localStorage.getItem("lela_recently_viewed");
-        if (recentIdsRaw) {
-          const recentIds = JSON.parse(recentIdsRaw);
-          const recentProducts = recentIds
-            .map(id => products.find(p => p.id === id))
-            .filter(Boolean);
-          setRecentlyViewed(recentProducts.slice(0, 4));
-        }
-      } catch (e) {
-        console.error("Failed to load homepage data", e);
+      // Load recently viewed
+      const recentIdsRaw = localStorage.getItem("lela_recently_viewed");
+      if (recentIdsRaw) {
+        const recentIds = JSON.parse(recentIdsRaw);
+        const recentProducts = recentIds
+          .map(id => products.find(p => p.id === id))
+          .filter(Boolean);
+        setRecentlyViewed(recentProducts.slice(0, 4));
       }
-    };
+    } catch (e) {
+      console.error("Failed to load homepage data", e);
+    }
+  };
+
+  useEffect(() => {
     loadHomeData();
+  }, []);
+
+  useEffect(() => {
+    const homeSubscription = supabase
+      .channel("realtime-home")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "products" },
+        () => { loadHomeData(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "settings" },
+        () => { loadHomeData(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "faqs" },
+        () => { loadHomeData(); }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "reviews" },
+        () => { loadHomeData(); }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(homeSubscription);
+    };
   }, []);
 
 

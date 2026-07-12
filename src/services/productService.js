@@ -1,7 +1,4 @@
-import { mockProducts } from "../data/mockProducts";
-import { supabase, isSupabaseConfigured } from "./supabaseClient";
-
-const PRODUCTS_KEY = "lela_products";
+import { supabase } from "./supabaseClient";
 
 const mapProductFromDb = (p) => {
   if (!p) return null;
@@ -31,7 +28,7 @@ const mapProductFromDb = (p) => {
 
 const mapProductToDb = (p) => {
   if (!p) return null;
-  const mapped = {
+  return {
     name: p.name,
     description: p.description,
     category: p.category,
@@ -52,83 +49,34 @@ const mapProductToDb = (p) => {
     discount_type: p.discountType || "none",
     discount_value: p.discountValue || 0
   };
-  return mapped;
-};
-
-const initProducts = () => {
-  const existing = localStorage.getItem(PRODUCTS_KEY);
-  let productsList;
-  if (!existing) {
-    productsList = mockProducts;
-  } else {
-    try {
-      productsList = JSON.parse(existing);
-    } catch (e) {
-      productsList = mockProducts;
-    }
-  }
-
-  const enriched = productsList.map(p => {
-    const cost = p.costEGP !== undefined ? p.costEGP : Math.round(p.priceEGP * 0.8);
-    const profit = p.profitEGP !== undefined ? p.profitEGP : Math.round(p.priceEGP * 0.2);
-    return {
-      ...p,
-      costEGP: cost,
-      profitEGP: profit,
-      priceEGP: cost + profit,
-      stock: p.stock !== undefined ? p.stock : 10,
-      status: p.status !== undefined ? p.status : "visible",
-      tags: p.tags !== undefined ? p.tags : ["new"],
-      images: p.images || [],
-      variants: p.variants || [],
-      discountType: p.discountType || "none",
-      discountValue: p.discountValue || 0
-    };
-  });
-
-  localStorage.setItem(PRODUCTS_KEY, JSON.stringify(enriched));
-  return enriched;
 };
 
 export const productService = {
   getAll: async () => {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .order("id", { ascending: false });
-        if (error) {
-          console.error("Supabase getAll error:", error);
-        } else if (data) {
-          return data.map(mapProductFromDb);
-        }
-      } catch (err) {
-        console.error("Supabase getAll connection issue:", err);
-      }
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .order("id", { ascending: false });
+      
+    if (error) {
+      console.error("Supabase getAll error:", error);
+      throw error;
     }
-    return initProducts();
+    return (data || []).map(mapProductFromDb);
   },
 
   getById: async (id) => {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from("products")
-          .select("*")
-          .eq("id", id)
-          .single();
-        if (error) {
-          console.error("Supabase getById error:", error);
-        } else if (data) {
-          return mapProductFromDb(data);
-        }
-      } catch (err) {
-        console.error("Supabase getById connection issue:", err);
-      }
+    const { data, error } = await supabase
+      .from("products")
+      .select("*")
+      .eq("id", id)
+      .single();
+      
+    if (error) {
+      console.error("Supabase getById error:", error);
+      throw error;
     }
-    const products = initProducts();
-    return products.find(p => p.id === id) || null;
+    return mapProductFromDb(data);
   },
 
   create: async (productData) => {
@@ -151,101 +99,49 @@ export const productService = {
       discountValue: parseFloat(productData.discountValue || 0)
     };
 
-    if (isSupabaseConfigured) {
-      try {
-        const dbPayload = mapProductToDb(payload);
-        const { data, error } = await supabase
-          .from("products")
-          .insert([dbPayload])
-          .select()
-          .single();
-        if (error) {
-          console.error("Supabase create error:", error);
-          throw error;
-        }
-        return mapProductFromDb(data);
-      } catch (err) {
-        console.error("Supabase create connection issue:", err);
-      }
+    const dbPayload = mapProductToDb(payload);
+    const { data, error } = await supabase
+      .from("products")
+      .insert([dbPayload])
+      .select()
+      .single();
+      
+    if (error) {
+      console.error("Supabase create error:", error);
+      throw error;
     }
-
-    const products = initProducts();
-    const newProduct = {
-      ...payload,
-      id: "p_" + Date.now(),
-    };
-    products.push(newProduct);
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-    return newProduct;
+    return mapProductFromDb(data);
   },
 
   update: async (id, updatedData) => {
-    if (isSupabaseConfigured) {
-      try {
-        const dbPayload = mapProductToDb(updatedData);
-        // Remove undefined keys
-        Object.keys(dbPayload).forEach(key => dbPayload[key] === undefined && delete dbPayload[key]);
-        const { data, error } = await supabase
-          .from("products")
-          .update(dbPayload)
-          .eq("id", id)
-          .select()
-          .single();
-        if (error) {
-          console.error("Supabase update error:", error);
-          throw error;
-        }
-        return mapProductFromDb(data);
-      } catch (err) {
-        console.error("Supabase update connection issue:", err);
-      }
+    const dbPayload = mapProductToDb(updatedData);
+    // Remove undefined keys
+    Object.keys(dbPayload).forEach(key => dbPayload[key] === undefined && delete dbPayload[key]);
+    
+    const { data, error } = await supabase
+      .from("products")
+      .update(dbPayload)
+      .eq("id", id)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error("Supabase update error:", error);
+      throw error;
     }
-
-    const products = initProducts();
-    const idx = products.findIndex(p => p.id === id);
-    if (idx === -1) throw new Error("Product not found");
-
-    const cost = parseFloat(updatedData.costEGP !== undefined ? updatedData.costEGP : products[idx].costEGP);
-    const profit = parseFloat(updatedData.profitEGP !== undefined ? updatedData.profitEGP : products[idx].profitEGP);
-
-    products[idx] = {
-      ...products[idx],
-      ...updatedData,
-      costEGP: cost,
-      profitEGP: profit,
-      priceEGP: cost + profit,
-      weight: parseFloat(updatedData.weight !== undefined ? updatedData.weight : products[idx].weight),
-      stock: parseInt(updatedData.stock !== undefined ? updatedData.stock : products[idx].stock, 10),
-      status: updatedData.status || products[idx].status || "visible",
-      tags: updatedData.tags || products[idx].tags || [],
-      images: updatedData.images || products[idx].images || [],
-      variants: updatedData.variants || products[idx].variants || [],
-      discountType: updatedData.discountType || products[idx].discountType || "none",
-      discountValue: parseFloat(updatedData.discountValue !== undefined ? updatedData.discountValue : products[idx].discountValue || 0)
-    };
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(products));
-    return products[idx];
+    return mapProductFromDb(data);
   },
 
   delete: async (id) => {
-    if (isSupabaseConfigured) {
-      try {
-        const { error } = await supabase
-          .from("products")
-          .delete()
-          .eq("id", id);
-        if (error) {
-          console.error("Supabase delete error:", error);
-          throw error;
-        }
-        return true;
-      } catch (err) {
-        console.error("Supabase delete connection issue:", err);
-      }
+    const { error } = await supabase
+      .from("products")
+      .delete()
+      .eq("id", id);
+      
+    if (error) {
+      console.error("Supabase delete error:", error);
+      throw error;
     }
-    const products = initProducts();
-    const filtered = products.filter(p => p.id !== id);
-    localStorage.setItem(PRODUCTS_KEY, JSON.stringify(filtered));
     return true;
   }
 };

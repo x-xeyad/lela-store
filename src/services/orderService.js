@@ -1,6 +1,4 @@
-import { supabase, isSupabaseConfigured } from "./supabaseClient";
-
-const ORDERS_KEY = "lela_orders";
+import { supabase } from "./supabaseClient";
 
 const mapOrderFromDb = (o) => {
   if (!o) return null;
@@ -36,58 +34,32 @@ const mapOrderToDb = (o) => {
   };
 };
 
-const initOrders = () => {
-  const existing = localStorage.getItem(ORDERS_KEY);
-  if (!existing) {
-    localStorage.setItem(ORDERS_KEY, JSON.stringify([]));
-    return [];
-  }
-  try {
-    return JSON.parse(existing);
-  } catch (e) {
-    return [];
-  }
-};
-
 export const orderService = {
   getAll: async () => {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .order("created_at", { ascending: false });
-        if (error) {
-          console.error("Supabase orders error:", error);
-        } else if (data) {
-          return data.map(mapOrderFromDb);
-        }
-      } catch (err) {
-        console.error("Supabase orders connection issue:", err);
-      }
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .order("created_at", { ascending: false });
+      
+    if (error) {
+      console.error("Supabase orders error:", error);
+      throw error;
     }
-    return initOrders();
+    return (data || []).map(mapOrderFromDb);
   },
 
   getById: async (id) => {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from("orders")
-          .select("*")
-          .eq("id", id)
-          .single();
-        if (error) {
-          console.error("Supabase getOrderById error:", error);
-        } else if (data) {
-          return mapOrderFromDb(data);
-        }
-      } catch (err) {
-        console.error("Supabase getOrderById connection issue:", err);
-      }
+    const { data, error } = await supabase
+      .from("orders")
+      .select("*")
+      .eq("id", id)
+      .single();
+      
+    if (error) {
+      console.error("Supabase getOrderById error:", error);
+      throw error;
     }
-    const orders = initOrders();
-    return orders.find(o => o.id === id) || null;
+    return mapOrderFromDb(data);
   },
 
   create: async (orderData) => {
@@ -98,76 +70,45 @@ export const orderService = {
       createdAt: new Date().toISOString()
     };
 
-    if (isSupabaseConfigured) {
-      try {
-        const dbPayload = mapOrderToDb(newOrder);
-        const { data, error } = await supabase
-          .from("orders")
-          .insert([dbPayload])
-          .select()
-          .single();
-        if (error) {
-          console.error("Supabase order creation error:", error);
-          throw error;
-        }
-        return mapOrderFromDb(data);
-      } catch (err) {
-        console.error("Supabase order create exception:", err);
-      }
+    const dbPayload = mapOrderToDb(newOrder);
+    const { data, error } = await supabase
+      .from("orders")
+      .insert([dbPayload])
+      .select()
+      .single();
+      
+    if (error) {
+      console.error("Supabase order creation error:", error);
+      throw error;
     }
-
-    const orders = initOrders();
-    orders.unshift(newOrder);
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-    return newOrder;
+    return mapOrderFromDb(data);
   },
 
   updateStatus: async (id, status) => {
-    if (isSupabaseConfigured) {
-      try {
-        const { data, error } = await supabase
-          .from("orders")
-          .update({ status })
-          .eq("id", id)
-          .select()
-          .single();
-        if (error) {
-          console.error("Supabase order status update error:", error);
-          throw error;
-        }
-        return mapOrderFromDb(data);
-      } catch (err) {
-        console.error("Supabase order status update exception:", err);
-      }
+    const { data, error } = await supabase
+      .from("orders")
+      .update({ status })
+      .eq("id", id)
+      .select()
+      .single();
+      
+    if (error) {
+      console.error("Supabase order status update error:", error);
+      throw error;
     }
-
-    const orders = initOrders();
-    const idx = orders.findIndex(o => o.id === id);
-    if (idx === -1) throw new Error("Order not found");
-    orders[idx].status = status;
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(orders));
-    return orders[idx];
+    return mapOrderFromDb(data);
   },
 
   delete: async (id) => {
-    if (isSupabaseConfigured) {
-      try {
-        const { error } = await supabase
-          .from("orders")
-          .delete()
-          .eq("id", id);
-        if (error) {
-          console.error("Supabase delete order error:", error);
-          throw error;
-        }
-        return true;
-      } catch (err) {
-        console.error("Supabase delete order exception:", err);
-      }
+    const { error } = await supabase
+      .from("orders")
+      .delete()
+      .eq("id", id);
+      
+    if (error) {
+      console.error("Supabase delete order error:", error);
+      throw error;
     }
-    const orders = initOrders();
-    const filtered = orders.filter(o => o.id !== id);
-    localStorage.setItem(ORDERS_KEY, JSON.stringify(filtered));
     return true;
   }
 };

@@ -6,6 +6,7 @@ import { orderService } from "../services/orderService";
 import { storageService } from "../services/storageService";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
+import { supabase } from "../services/supabaseClient";
 import {
   Lock,
   LogOut,
@@ -257,6 +258,24 @@ export const Admin = () => {
   useEffect(() => {
     if (isAuthenticated) {
       loadData();
+
+      const adminSubscription = supabase
+        .channel("realtime-admin")
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "orders" },
+          () => { loadData(); }
+        )
+        .on(
+          "postgres_changes",
+          { event: "*", schema: "public", table: "products" },
+          () => { loadData(); }
+        )
+        .subscribe();
+
+      return () => {
+        supabase.removeChannel(adminSubscription);
+      };
     }
   }, [isAuthenticated]);
 
@@ -666,19 +685,47 @@ export const Admin = () => {
       try {
         const data = JSON.parse(event.target.result);
         if (data.products && data.settings) {
-          localStorage.setItem("lela_products", JSON.stringify(data.products));
-          localStorage.setItem("lela_settings", JSON.stringify(data.settings));
-          if (data.orders) {
-            localStorage.setItem("lela_orders", JSON.stringify(data.orders));
+          // Import products into Supabase
+          if (data.products.length > 0) {
+            await supabase.from("products").delete().neq("id", "0");
+            const mappedProds = data.products.map(p => ({
+              id: p.id,
+              name: p.name,
+              description: p.description,
+              category: p.category,
+              cost_egp: p.costEGP || 0,
+              profit_egp: p.profitEGP || 0,
+              price_egp: p.priceEGP || 0,
+              weight: p.weight || 0.5,
+              images: p.images || [],
+              featured: !!p.featured,
+              sizes: p.sizes || [],
+              colors: p.colors || [],
+              variants: p.variants || [],
+              stock: p.stock || 10,
+              status: p.status || "visible",
+              tags: p.tags || [],
+              rating: p.rating || 5.0,
+              reviews_count: p.reviewsCount || 0,
+              discount_type: p.discountType || "none",
+              discount_value: p.discountValue || 0
+            }));
+            await supabase.from("products").insert(mappedProds);
+          }
+          // Import settings key values into Supabase
+          for (const [key, value] of Object.entries(data.settings)) {
+            await supabase.from("settings").upsert({ key, value });
           }
           await settingsService.addActivityLog("concierge database fully restored from backup");
           toast.success("Concierge database restored successfully!");
           loadData();
+          await loadThemeSettings();
         } else {
           toast.error("Invalid backup file format.");
         }
       } catch (err) {
-        toast.error("Failed to parse backup file.");
+        console.error(err);
+        toast.error("Failed to restore backup.");
       }
     };
     reader.readAsText(file);
