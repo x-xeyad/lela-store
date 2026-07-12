@@ -820,7 +820,7 @@ export const Admin = () => {
 
   const handleFaqSubmit = async (e) => {
     e.preventDefault();
-    const updatedFaqs = [...settings.faq];
+    const updatedFaqs = [...(settings?.faq || [])];
     const payload = {
       id: editingFaq ? editingFaq.id : "f_" + Date.now(),
       question: { en: faqForm.qEn, ar: faqForm.qAr },
@@ -842,7 +842,7 @@ export const Admin = () => {
 
   const handleDeleteFaq = async (id) => {
     if (window.confirm("Delete FAQ?")) {
-      const filtered = settings.faq.filter(f => f.id !== id);
+      const filtered = (settings?.faq || []).filter(f => f.id !== id);
       await settingsService.saveFaqs(filtered);
       toast.success("FAQ deleted.");
       loadData();
@@ -871,7 +871,7 @@ export const Admin = () => {
 
   const handleReviewSubmit = async (e) => {
     e.preventDefault();
-    const updatedReviews = [...settings.reviews];
+    const updatedReviews = [...(settings?.reviews || [])];
     const payload = {
       id: editingReview ? editingReview.id : "r_" + Date.now(),
       name: reviewForm.name,
@@ -896,7 +896,7 @@ export const Admin = () => {
 
   const handleDeleteReview = async (id) => {
     if (window.confirm("Delete review?")) {
-      const filtered = settings.reviews.filter(r => r.id !== id);
+      const filtered = (settings?.reviews || []).filter(r => r.id !== id);
       await settingsService.saveReviews(filtered);
       toast.success("Review deleted.");
       loadData();
@@ -2399,7 +2399,7 @@ export const Admin = () => {
               </div>
 
               <div className="space-y-4">
-                {settings.faq.map(f => (
+                {(settings?.faq || []).map(f => (
                   <div key={f.id} className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10 flex justify-between items-center gap-4">
                     <div>
                       <h4 className="font-semibold text-xs text-brand-text">{f.question.en}</h4>
@@ -2436,7 +2436,7 @@ export const Admin = () => {
               </div>
 
               <div className="space-y-4">
-                {settings.reviews.map(r => (
+                {(settings?.reviews || []).map(r => (
                   <div key={r.id} className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10 flex justify-between items-center gap-4">
                     <div className="flex items-center gap-3">
                       <img src={r.avatar} alt="" className="w-8 h-8 rounded-full object-cover" />
