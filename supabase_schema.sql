@@ -136,6 +136,23 @@ CREATE POLICY "Allow all actions for admins on orders" ON orders USING (auth.rol
 -- Also allow public insert on orders (to allow clients to checkout)
 CREATE POLICY "Allow client checkout insertion" ON orders FOR INSERT WITH CHECK (true);
 
--- 11. Create storage bucket for LELA media uploads
+-- 11. Special Orders Table
+CREATE TABLE IF NOT EXISTS special_orders (
+  id TEXT PRIMARY KEY,
+  date TEXT NOT NULL,
+  customer JSONB NOT NULL,
+  description TEXT NOT NULL,
+  weight NUMERIC NOT NULL DEFAULT 0.5,
+  image_url TEXT,
+  status TEXT NOT NULL DEFAULT 'pending',
+  created_at TIMESTAMPTZ DEFAULT now()
+);
+
+ALTER TABLE special_orders ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Allow public select on special_orders" ON special_orders FOR SELECT USING (true);
+CREATE POLICY "Allow public insert on special_orders" ON special_orders FOR INSERT WITH CHECK (true);
+CREATE POLICY "Allow all actions for admins on special_orders" ON special_orders USING (auth.role() = 'authenticated');
+
+-- 12. Create storage bucket for LELA media uploads
 -- Note: You should create the bucket 'lela-media' manually in the Supabase Storage dashboard 
 -- and set its visibility to PUBLIC.

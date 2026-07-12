@@ -175,24 +175,26 @@ export const Admin = () => {
   // Load all admin data
   const loadData = async () => {
     try {
-      const allProducts = await productService.getAll();
+      const [allProducts, allOrders, allSettings, categoriesList] = await Promise.all([
+        productService.getAll(),
+        orderService.getAll(),
+        settingsService.get(),
+        settingsService.getCategories()
+      ]);
+
       setProducts(allProducts);
-
-      const allOrders = await orderService.getAll();
       setOrders(allOrders);
-
-      const allSettings = await settingsService.get();
       setSettings(allSettings);
 
       // Prepopulate Forms
       setShippingForm({
-        personalCare: allSettings.shippingRates.personalCare,
-        clothingHome: allSettings.shippingRates.clothingHome,
-        egpToYerRate: allSettings.currency.egpToYerRate,
-        yerToSarRate: allSettings.currency.yerToSarRate || 140
+        personalCare: allSettings?.shippingRates?.personalCare || 450,
+        clothingHome: allSettings?.shippingRates?.clothingHome || 300,
+        egpToYerRate: allSettings?.currency?.egpToYerRate || 11.5,
+        yerToSarRate: allSettings?.currency?.yerToSarRate || 140
       });
 
-      setCategories(allSettings.categories || []);
+      setCategories(categoriesList || []);
 
       // Load Special Sourcing orders, Coupons, Activity logs, SEO & Maintenance
       const specialList = await settingsService.getSpecialOrders();
@@ -206,48 +208,48 @@ export const Admin = () => {
 
       const seoSettings = await settingsService.getSeoSettings();
       setSeoForm({
-        title: seoSettings.title || "",
-        description: seoSettings.description || "",
-        keywords: seoSettings.keywords || ""
+        title: seoSettings?.title || "",
+        description: seoSettings?.description || "",
+        keywords: seoSettings?.keywords || ""
       });
 
       const mode = await settingsService.getMaintenanceMode();
       setMaintenanceMode(mode || false);
 
       setBrandingForm({
-        heroTitleEn: allSettings.homepage.hero.title.en,
-        heroTitleAr: allSettings.homepage.hero.title.ar,
-        heroSubtitleEn: allSettings.homepage.hero.subtitle.en,
-        heroSubtitleAr: allSettings.homepage.hero.subtitle.ar,
-        logoUrl: allSettings.branding.logoUrl || "",
-        logoDarkUrl: allSettings.branding.logoDarkUrl || "",
-        faviconUrl: allSettings.branding.faviconUrl || "",
-        loadingLogoUrl: allSettings.branding.loadingLogoUrl || "",
-        browserIconUrl: allSettings.branding.browserIconUrl || "",
-        websiteName: allSettings.branding.websiteName || "LELA",
+        heroTitleEn: allSettings?.homepage?.hero?.title?.en || "",
+        heroTitleAr: allSettings?.homepage?.hero?.title?.ar || "",
+        heroSubtitleEn: allSettings?.homepage?.hero?.subtitle?.en || "",
+        heroSubtitleAr: allSettings?.homepage?.hero?.subtitle?.ar || "",
+        logoUrl: allSettings?.branding?.logoUrl || "",
+        logoDarkUrl: allSettings?.branding?.logoDarkUrl || "",
+        faviconUrl: allSettings?.branding?.faviconUrl || "",
+        loadingLogoUrl: allSettings?.branding?.loadingLogoUrl || "",
+        browserIconUrl: allSettings?.branding?.browserIconUrl || "",
+        websiteName: allSettings?.branding?.websiteName || "LELA",
         
-        primaryColor: allSettings.theme?.primaryColor || allSettings.branding.primaryColor || "#8A3D5A",
-        secondaryColor: allSettings.theme?.secondaryColor || allSettings.branding.secondaryColor || "#E3B8AE",
-        accentColor: allSettings.theme?.accentColor || "#D7A5AE",
-        backgroundColor: allSettings.theme?.backgroundColor || allSettings.branding.backgroundColor || "#FFF9F7",
-        textColor: allSettings.theme?.textColor || allSettings.branding.textColor || "#3A2A30",
+        primaryColor: allSettings?.theme?.primaryColor || allSettings?.branding?.primaryColor || "#8A3D5A",
+        secondaryColor: allSettings?.theme?.secondaryColor || allSettings?.branding?.secondaryColor || "#E3B8AE",
+        accentColor: allSettings?.theme?.accentColor || "#D7A5AE",
+        backgroundColor: allSettings?.theme?.backgroundColor || allSettings?.branding?.backgroundColor || "#FFF9F7",
+        textColor: allSettings?.theme?.textColor || allSettings?.branding?.textColor || "#3A2A30",
         
-        darkPrimaryColor: allSettings.theme?.darkPrimaryColor || "#8A3D5A",
-        darkSecondaryColor: allSettings.theme?.darkSecondaryColor || "#E3B8AE",
-        darkAccentColor: allSettings.theme?.darkAccentColor || "#D7A5AE",
-        darkBackgroundColor: allSettings.theme?.darkBackgroundColor || "#0F172A",
-        darkTextColor: allSettings.theme?.darkTextColor || "#FFFFFF",
+        darkPrimaryColor: allSettings?.theme?.darkPrimaryColor || "#8A3D5A",
+        darkSecondaryColor: allSettings?.theme?.darkSecondaryColor || "#E3B8AE",
+        darkAccentColor: allSettings?.theme?.darkAccentColor || "#D7A5AE",
+        darkBackgroundColor: allSettings?.theme?.darkBackgroundColor || "#0F172A",
+        darkTextColor: allSettings?.theme?.darkTextColor || "#FFFFFF",
         
-        buttonRadius: allSettings.theme?.buttonRadius || "12px",
-        borderWidth: allSettings.theme?.borderWidth || "1px",
-        cardBg: allSettings.theme?.cardBg || "#FFFFFF",
-        darkCardBg: allSettings.theme?.darkCardBg || "#1E293B",
+        buttonRadius: allSettings?.theme?.buttonRadius || "12px",
+        borderWidth: allSettings?.theme?.borderWidth || "1px",
+        cardBg: allSettings?.theme?.cardBg || "#FFFFFF",
+        darkCardBg: allSettings?.theme?.darkCardBg || "#1E293B",
 
-        phoneEgypt: allSettings.contactInfo.phoneEgypt,
-        phoneYemen: allSettings.contactInfo.phoneYemen,
-        email: allSettings.contactInfo.email,
-        instagram: allSettings.contactInfo.instagram,
-        facebook: allSettings.contactInfo.facebook
+        phoneEgypt: allSettings?.contactInfo?.phoneEgypt || "",
+        phoneYemen: allSettings?.contactInfo?.phoneYemen || "",
+        email: allSettings?.contactInfo?.email || "",
+        instagram: allSettings?.contactInfo?.instagram || "",
+        facebook: allSettings?.contactInfo?.facebook || ""
       });
     } catch (e) {
       console.error(e);

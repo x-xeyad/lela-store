@@ -6,6 +6,36 @@ import { supabase } from "../services/supabaseClient";
 
 const ThemeContext = createContext();
 
+const defaultBranding = {
+  logoUrl: "",
+  logoDarkUrl: "",
+  faviconUrl: "",
+  loadingLogoUrl: "",
+  browserIconUrl: "",
+  websiteName: "LELA Store",
+  primaryColor: "#8A3D5A",
+  secondaryColor: "#E3B8AE",
+  backgroundColor: "#FFF9F7",
+  textColor: "#3A2A30"
+};
+
+const defaultTheme = {
+  primaryColor: "#8A3D5A",
+  secondaryColor: "#E3B8AE",
+  accentColor: "#D7A5AE",
+  backgroundColor: "#FFF9F7",
+  textColor: "#3A2A30",
+  darkPrimaryColor: "#8A3D5A",
+  darkSecondaryColor: "#E3B8AE",
+  darkAccentColor: "#D7A5AE",
+  darkBackgroundColor: "#0F172A",
+  darkTextColor: "#FFFFFF",
+  buttonRadius: "12px",
+  borderWidth: "1px",
+  cardBg: "#FFFFFF",
+  darkCardBg: "#1E293B"
+};
+
 export const ThemeProvider = ({ children }) => {
   const [theme, setTheme] = useState(() => {
     const saved = localStorage.getItem("lela_theme");
@@ -14,18 +44,18 @@ export const ThemeProvider = ({ children }) => {
     return prefersDark ? "dark" : "light";
   });
 
-  const [branding, setBranding] = useState(null);
-  const [themeSettings, setThemeSettings] = useState(null);
+  const [branding, setBranding] = useState(defaultBranding);
+  const [themeSettings, setThemeSettings] = useState(defaultTheme);
 
   const loadThemeSettings = async () => {
     try {
       const config = await settingsService.get();
       if (config) {
-        setBranding(config.branding);
-        setThemeSettings(config.theme);
+        if (config.branding) setBranding(prev => ({ ...prev, ...config.branding }));
+        if (config.theme) setThemeSettings(prev => ({ ...prev, ...config.theme }));
       }
     } catch (e) {
-      console.error("Failed to load theme config:", e);
+      console.warn("Failed to load theme config, using defaults:", e);
     }
   };
 
@@ -62,39 +92,39 @@ export const ThemeProvider = ({ children }) => {
 
   // Apply Theme Colors dynamically based on active theme
   useEffect(() => {
-    if (!themeSettings) return;
     const root = document.documentElement;
+    const activeTheme = themeSettings || defaultTheme;
     
     if (theme === "dark") {
-      root.style.setProperty("--primary", themeSettings.darkPrimaryColor || "#8A3D5A");
-      root.style.setProperty("--primary-dark", themeSettings.darkPrimaryColor || "#74334B");
-      root.style.setProperty("--primary-light", themeSettings.darkAccentColor || "#A35A75");
-      root.style.setProperty("--secondary", themeSettings.darkSecondaryColor || "#E3B8AE");
-      root.style.setProperty("--background", themeSettings.darkBackgroundColor || "#0F172A");
-      root.style.setProperty("--surface", themeSettings.darkCardBg || "#1E293B");
-      root.style.setProperty("--text", themeSettings.darkTextColor || "#FFFFFF");
-      root.style.setProperty("--text-light", themeSettings.darkTextColor || "#CBD5E1");
-      root.style.setProperty("--border", themeSettings.darkBorderColor || "#334155");
+      root.style.setProperty("--primary", activeTheme.darkPrimaryColor || "#8A3D5A");
+      root.style.setProperty("--primary-dark", activeTheme.darkPrimaryColor || "#74334B");
+      root.style.setProperty("--primary-light", activeTheme.darkAccentColor || "#A35A75");
+      root.style.setProperty("--secondary", activeTheme.darkSecondaryColor || "#E3B8AE");
+      root.style.setProperty("--background", activeTheme.darkBackgroundColor || "#0F172A");
+      root.style.setProperty("--surface", activeTheme.darkCardBg || "#1E293B");
+      root.style.setProperty("--text", activeTheme.darkTextColor || "#FFFFFF");
+      root.style.setProperty("--text-light", activeTheme.darkTextColor || "#CBD5E1");
+      root.style.setProperty("--border", activeTheme.darkBorderColor || "#334155");
     } else {
-      root.style.setProperty("--primary", themeSettings.primaryColor || "#8A3D5A");
-      root.style.setProperty("--primary-dark", themeSettings.primaryColor || "#74334B");
-      root.style.setProperty("--primary-light", themeSettings.accentColor || "#A35A75");
-      root.style.setProperty("--secondary", themeSettings.secondaryColor || "#E3B8AE");
-      root.style.setProperty("--background", themeSettings.backgroundColor || "#FFF9F7");
-      root.style.setProperty("--surface", themeSettings.cardBg || "#FFFFFF");
-      root.style.setProperty("--text", themeSettings.textColor || "#3A2A30");
-      root.style.setProperty("--text-light", themeSettings.textColor || "#7A6770");
-      root.style.setProperty("--border", themeSettings.borderColor || "#E8D5CF");
+      root.style.setProperty("--primary", activeTheme.primaryColor || "#8A3D5A");
+      root.style.setProperty("--primary-dark", activeTheme.primaryColor || "#74334B");
+      root.style.setProperty("--primary-light", activeTheme.accentColor || "#A35A75");
+      root.style.setProperty("--secondary", activeTheme.secondaryColor || "#E3B8AE");
+      root.style.setProperty("--background", activeTheme.backgroundColor || "#FFF9F7");
+      root.style.setProperty("--surface", activeTheme.cardBg || "#FFFFFF");
+      root.style.setProperty("--text", activeTheme.textColor || "#3A2A30");
+      root.style.setProperty("--text-light", activeTheme.textColor || "#7A6770");
+      root.style.setProperty("--border", activeTheme.borderColor || "#E8D5CF");
     }
   }, [theme, themeSettings]);
 
   // Apply Branding Metadata
   useEffect(() => {
-    if (!branding) return;
-    if (branding.websiteName) {
-      document.title = branding.websiteName;
+    const activeBranding = branding || defaultBranding;
+    if (activeBranding.websiteName) {
+      document.title = activeBranding.websiteName;
     }
-    if (branding.faviconUrl) {
+    if (activeBranding.faviconUrl) {
       let link = document.querySelector("link[rel*='icon']");
       if (!link) {
         link = document.createElement("link");
@@ -102,7 +132,7 @@ export const ThemeProvider = ({ children }) => {
         link.rel = "shortcut icon";
         document.getElementsByTagName("head")[0].appendChild(link);
       }
-      link.href = branding.faviconUrl;
+      link.href = activeBranding.faviconUrl;
     }
   }, [branding]);
 

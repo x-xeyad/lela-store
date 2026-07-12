@@ -36,10 +36,31 @@ export const Home = () => {
   const { language, t, isRtl } = useLanguage();
   
   // Dynamic State loaded from Settings Database (mock localstorage)
-  const [homepageData, setHomepageData] = useState(null);
+  const [homepageData, setHomepageData] = useState({
+    hero: {
+      title: {
+        en: "Shopping from Egypt. Shipping to Yemen.",
+        ar: "تسوقي من مصر. الشحن لليمن."
+      },
+      subtitle: {
+        en: "LELA is your premium personal shopping concierge. We acquire luxury products, fashion, and personal care from Cairo and deliver directly to your doorstep in Yemen.",
+        ar: "ليلا هي رفيقة تسوقك الشخصية الفاخرة. نوفر لكِ مستحضرات التجميل، الأزياء، والمنتجات المنزلية من القاهرة ونوصلها مباشرة إلى باب بيتكِ في اليمن."
+      }
+    },
+    whyLela: [],
+    howItWorks: []
+  });
   const [faqs, setFaqs] = useState([]);
   const [reviews, setReviews] = useState([]);
-  const [contactInfo, setContactInfo] = useState(null);
+  const [contactInfo, setContactInfo] = useState({
+    phoneEgypt: '+201557179009',
+    phoneYemen: '+967784990676',
+    email: 'lela.storex@gmail.com',
+    instagram: 'https://instagram.com/lela_e0',
+    facebook: 'https://facebook.com/lela.e0',
+    whatsappEgypt: 'https://wa.me/201557179009',
+    whatsappYemen: 'https://wa.me/967784990676'
+  });
   const [featuredProducts, setFeaturedProducts] = useState([]);
   const [categories, setCategories] = useState([]);
   const [activeFaq, setActiveFaq] = useState(null);
@@ -52,14 +73,20 @@ export const Home = () => {
 
   const loadHomeData = async () => {
     try {
-      const settings = await settingsService.get();
-      setHomepageData(settings.homepage);
-      setFaqs(settings.faq);
-      setReviews(settings.reviews);
-      setContactInfo(settings.contactInfo);
-      setCategories(settings.categories || []);
+      const [settings, faqsList, reviewsList, categoriesList, products] = await Promise.all([
+        settingsService.get(),
+        settingsService.getFaqs(),
+        settingsService.getReviews(),
+        settingsService.getCategories(),
+        productService.getAll()
+      ]);
 
-      const products = await productService.getAll();
+      if (settings?.homepage) setHomepageData(settings.homepage);
+      if (settings?.contactInfo) setContactInfo(settings.contactInfo);
+      if (faqsList) setFaqs(faqsList);
+      if (reviewsList) setReviews(reviewsList);
+      if (categoriesList) setCategories(categoriesList);
+
       setFeaturedProducts(products.filter(p => p.featured));
 
       // Load recently viewed
@@ -121,14 +148,6 @@ export const Home = () => {
       default: return <Sparkles className="w-5 h-5 text-primary" />;
     }
   };
-
-  if (!homepageData || !contactInfo) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-h-[60vh]">
-        <div className="w-10 h-10 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
 
   const heroTitle = homepageData.hero.title[language] || homepageData.hero.title.en;
   const heroSubtitle = homepageData.hero.subtitle[language] || homepageData.hero.subtitle.en;

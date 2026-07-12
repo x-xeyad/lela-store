@@ -53,95 +53,120 @@ const mapProductToDb = (p) => {
 
 export const productService = {
   getAll: async () => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .order("id", { ascending: false });
-      
-    if (error) {
-      console.error("Supabase getAll error:", error);
-      throw error;
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .order("id", { ascending: false });
+        
+      if (error) {
+        console.warn("Supabase getAll products warning:", error.message);
+        return [];
+      }
+      return (data || []).map(mapProductFromDb);
+    } catch (e) {
+      console.warn("Exception in getAll products:", e);
+      return [];
     }
-    return (data || []).map(mapProductFromDb);
   },
 
   getById: async (id) => {
-    const { data, error } = await supabase
-      .from("products")
-      .select("*")
-      .eq("id", id)
-      .single();
-      
-    if (error) {
-      console.error("Supabase getById error:", error);
-      throw error;
+    try {
+      const { data, error } = await supabase
+        .from("products")
+        .select("*")
+        .eq("id", id)
+        .single();
+        
+      if (error) {
+        console.warn(`Supabase getById product warning for id "${id}":`, error.message);
+        return null;
+      }
+      return mapProductFromDb(data);
+    } catch (e) {
+      console.warn(`Exception in getById product for id "${id}":`, e);
+      return null;
     }
-    return mapProductFromDb(data);
   },
 
   create: async (productData) => {
-    const cost = parseFloat(productData.costEGP || 0);
-    const profit = parseFloat(productData.profitEGP || 0);
-    const payload = {
-      ...productData,
-      rating: parseFloat(productData.rating || 5.0),
-      reviewsCount: parseInt(productData.reviewsCount || 0, 10),
-      costEGP: cost,
-      profitEGP: profit,
-      priceEGP: cost + profit,
-      weight: parseFloat(productData.weight || 0.5),
-      stock: parseInt(productData.stock !== undefined ? productData.stock : 10, 10),
-      status: productData.status || "visible",
-      tags: productData.tags || [],
-      images: productData.images || [],
-      variants: productData.variants || [],
-      discountType: productData.discountType || "none",
-      discountValue: parseFloat(productData.discountValue || 0)
-    };
+    try {
+      const cost = parseFloat(productData.costEGP || 0);
+      const profit = parseFloat(productData.profitEGP || 0);
+      const payload = {
+        ...productData,
+        rating: parseFloat(productData.rating || 5.0),
+        reviewsCount: parseInt(productData.reviewsCount || 0, 10),
+        costEGP: cost,
+        profitEGP: profit,
+        priceEGP: cost + profit,
+        weight: parseFloat(productData.weight || 0.5),
+        stock: parseInt(productData.stock !== undefined ? productData.stock : 10, 10),
+        status: productData.status || "visible",
+        tags: productData.tags || [],
+        images: productData.images || [],
+        variants: productData.variants || [],
+        discountType: productData.discountType || "none",
+        discountValue: parseFloat(productData.discountValue || 0)
+      };
 
-    const dbPayload = mapProductToDb(payload);
-    const { data, error } = await supabase
-      .from("products")
-      .insert([dbPayload])
-      .select()
-      .single();
-      
-    if (error) {
-      console.error("Supabase create error:", error);
-      throw error;
+      const dbPayload = mapProductToDb(payload);
+      const { data, error } = await supabase
+        .from("products")
+        .insert([dbPayload])
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Supabase create product error:", error.message);
+        throw error;
+      }
+      return mapProductFromDb(data);
+    } catch (e) {
+      console.error("Exception in create product:", e);
+      throw e;
     }
-    return mapProductFromDb(data);
   },
 
   update: async (id, updatedData) => {
-    const dbPayload = mapProductToDb(updatedData);
-    // Remove undefined keys
-    Object.keys(dbPayload).forEach(key => dbPayload[key] === undefined && delete dbPayload[key]);
-    
-    const { data, error } = await supabase
-      .from("products")
-      .update(dbPayload)
-      .eq("id", id)
-      .select()
-      .single();
+    try {
+      const dbPayload = mapProductToDb(updatedData);
+      // Remove undefined keys
+      Object.keys(dbPayload).forEach(key => dbPayload[key] === undefined && delete dbPayload[key]);
       
-    if (error) {
-      console.error("Supabase update error:", error);
-      throw error;
+      const { data, error } = await supabase
+        .from("products")
+        .update(dbPayload)
+        .eq("id", id)
+        .select()
+        .single();
+        
+      if (error) {
+        console.error(`Supabase update product error for id "${id}":`, error.message);
+        throw error;
+      }
+      return mapProductFromDb(data);
+    } catch (e) {
+      console.error(`Exception in update product for id "${id}":`, e);
+      throw e;
     }
-    return mapProductFromDb(data);
   },
 
   delete: async (id) => {
-    const { error } = await supabase
-      .from("products")
-      .delete()
-      .eq("id", id);
-      
-    if (error) {
-      console.error("Supabase delete error:", error);
-      throw error;
+    try {
+      const { error } = await supabase
+        .from("products")
+        .delete()
+        .eq("id", id);
+        
+      if (error) {
+        console.error(`Supabase delete product error for id "${id}":`, error.message);
+        throw error;
+      }
+      return true;
+    } catch (e) {
+      console.error(`Exception in delete product for id "${id}":`, e);
+      throw e;
     }
-    return true;
   }
 };
