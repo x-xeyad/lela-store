@@ -81,7 +81,18 @@ export const Home = () => {
         productService.getAll()
       ]);
 
-      if (settings?.homepage) setHomepageData(settings.homepage);
+      if (settings?.homepage) {
+        setHomepageData(prev => ({
+          ...prev,
+          ...settings.homepage,
+          hero: {
+            ...prev.hero,
+            ...(settings.homepage.hero || {})
+          },
+          whyLela: settings.homepage.whyLela || [],
+          howItWorks: settings.homepage.howItWorks || []
+        }));
+      }
       if (settings?.contactInfo) setContactInfo(settings.contactInfo);
       if (faqsList) setFaqs(faqsList);
       if (reviewsList) setReviews(reviewsList);
@@ -243,7 +254,7 @@ export const Home = () => {
         </div>
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6 md:gap-8">
-          {homepageData.whyLela.map((item, idx) => (
+          {(homepageData?.whyLela || []).map((item, idx) => (
             <div
               key={item.id}
               className="p-6 rounded-2xl bg-white dark:bg-brand-dark-card border border-primary/5 dark:border-secondary/5 shadow-sm space-y-4 hover:shadow-md hover:border-primary/10 transition-all duration-300"
@@ -367,7 +378,7 @@ export const Home = () => {
         </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-12 relative">
-          {homepageData.howItWorks.map((item, idx) => (
+          {(homepageData?.howItWorks || []).map((item, idx) => (
             <div key={item.step} className="flex flex-col items-center text-center space-y-4 relative z-10 group">
               <div className="w-16 h-16 rounded-full bg-white dark:bg-brand-dark-card border border-primary/10 dark:border-secondary/10 flex items-center justify-center text-xl font-bold font-english text-primary dark:text-secondary group-hover:scale-110 group-hover:border-primary transition-all duration-300 shadow-sm">
                 0{item.step}
