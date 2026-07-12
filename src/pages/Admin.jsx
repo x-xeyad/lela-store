@@ -176,15 +176,21 @@ export const Admin = () => {
   // Load all admin data
   const loadData = async () => {
     try {
-      const [allProducts, allOrders, allSettings, categoriesList] = await Promise.all([
+      const [allProducts, allOrders, allSettings, categoriesList, faqsList, reviewsList] = await Promise.all([
         productService.getAll(),
         orderService.getAll(),
         settingsService.get(),
-        settingsService.getCategories()
+        settingsService.getCategories(),
+        settingsService.getFaqs(),
+        settingsService.getReviews()
       ]);
 
       setProducts(allProducts);
       setOrders(allOrders);
+      if (allSettings) {
+        allSettings.faq = faqsList || [];
+        allSettings.reviews = reviewsList || [];
+      }
       setSettings(allSettings);
 
       // Prepopulate Forms
