@@ -7,6 +7,7 @@ import { storageService } from "../services/storageService";
 import { useLanguage } from "../context/LanguageContext";
 import { useTheme } from "../context/ThemeContext";
 import { supabase } from "../services/supabaseClient";
+import toast from "react-hot-toast";
 import {
   Lock,
   LogOut,
