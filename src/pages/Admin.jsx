@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { useAdmin } from "../context/AdminContext";
 import { productService } from "../services/productService";
 import { settingsService } from "../services/settingsService";
@@ -73,7 +73,7 @@ const serializeVariants = (variants) => {
 };
 
 export const Admin = () => {
-  const { isAuthenticated, login, logout } = useAdmin();
+  const { isAuthenticated, user, login, logout } = useAdmin();
   const { language, t } = useLanguage();
   const { loadThemeSettings, isDark } = useTheme();
   
@@ -1118,111 +1118,6 @@ export const Admin = () => {
     }
   };
 
-  // AUTH VIEW GATING
-  if (!isAuthenticated) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-h-[70vh] px-6 font-sans">
-        <div className="w-full max-w-md p-8 rounded-3xl bg-admin-card border border-admin-border shadow-2xl text-center space-y-6">
-          <div className="w-12 h-12 rounded-full bg-primary/5 dark:bg-secondary/5 flex items-center justify-center text-primary dark:text-secondary mx-auto">
-            <Lock className="w-6 h-6" />
-          </div>
-          <div className="space-y-1">
-            <h2 className="text-xl font-bold text-admin-text dark:text-white font-english uppercase tracking-wider">
-              {t("adminLogin")}
-            </h2>
-            <p className="text-[10px] text-admin-text-secondary font-light">
-              Log in with your administrator credentials to access the console
-            </p>
-          </div>
-          <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
-            <div className="space-y-1">
-              <label className="text-[10px] font-bold uppercase text-admin-text-secondary">Email Address</label>
-              <input
-                type="email"
-                required
-                placeholder="admin@lela.com"
-                value={emailInput}
-                onChange={(e) => setEmailInput(e.target.value)}
-                className="w-full px-4 py-2.5 rounded-xl border border-admin-border bg-admin-bg text-xs text-admin-text focus:outline-none focus:border-primary dark:text-white dark:border-secondary/10"
-              />
-            </div>
-            
-            <div className="space-y-1 relative">
-              <label className="text-[10px] font-bold uppercase text-admin-text-secondary font-sans">Password</label>
-              <div className="relative">
-                <input
-                  type={showPassword ? "text" : "password"}
-                  required
-                  placeholder="••••••••"
-                  value={passwordInput}
-                  onChange={(e) => setPasswordInput(e.target.value)}
-                  className="w-full px-4 py-2.5 rounded-xl border border-admin-border bg-admin-bg text-xs text-admin-text focus:outline-none focus:border-primary dark:text-white pr-10 font-bold dark:border-secondary/10"
-                />
-                <button
-                  type="button"
-                  onClick={() => setShowPassword(!showPassword)}
-                  className="absolute inset-y-0 right-3 flex items-center text-admin-text-secondary hover:text-admin-text cursor-pointer"
-                >
-                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
-                </button>
-              </div>
-            </div>
-
-            <div className="flex items-center justify-between pt-1">
-              <label className="flex items-center gap-2 text-xs font-semibold text-admin-text-secondary cursor-pointer">
-                <input
-                  type="checkbox"
-                  checked={rememberMe}
-                  onChange={(e) => setRememberMe(e.target.checked)}
-                  className="rounded border-admin-border text-primary w-4 h-4"
-                />
-                Remember Me
-              </label>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loginLoading}
-              className="w-full py-3.5 mt-2 rounded-xl bg-primary hover:bg-primary/95 text-white font-semibold text-xs tracking-wider uppercase font-english transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
-            >
-              {loginLoading ? (
-                <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
-              ) : (
-                t("login")
-              )}
-            </button>
-          </form>
-        </div>
-      </div>
-    );
-  }
-
-  // Loaded Settings verification
-  if (!settings) {
-    return (
-      <div className="flex-1 flex items-center justify-center min-h-[60vh]">
-        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
-      </div>
-    );
-  }
-
-  // Dashboard calculations
-  const completedOrders = orders.filter(o => o.status === "completed" || o.status === "delivered" || o.status === "completed");
-  const totalSalesEGP = completedOrders.reduce((acc, o) => acc + (o.totalEGP || 0), 0);
-  const totalSalesYER = completedOrders.reduce((acc, o) => acc + (o.totalYER || 0), 0);
-  const lowStockCount = products.filter(p => p.stock !== undefined && p.stock <= 3).length;
-  const pendingSpecialRequests = specialOrders.filter(so => so.status === "pending").length;
-
-  const dashboardStats = {
-    productsCount: products.length,
-    ordersCount: orders.length,
-    avgPrice: Math.round(products.reduce((acc, p) => acc + p.priceEGP, 0) / (products.length || 1)),
-    totalSalesEGP,
-    totalSalesYER,
-    lowStockCount,
-    pendingSpecialRequests
-  };
-
   const erpNotifications = useMemo(() => {
     const list = [];
     products.forEach(p => {
@@ -1329,6 +1224,113 @@ export const Admin = () => {
       return false;
     });
   }, [menuItems, userRole]);
+
+  // AUTH VIEW GATING
+  if (!isAuthenticated) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[70vh] px-6 font-sans">
+        <div className="w-full max-w-md p-8 rounded-3xl bg-admin-card border border-admin-border shadow-2xl text-center space-y-6">
+          <div className="w-12 h-12 rounded-full bg-primary/5 dark:bg-secondary/5 flex items-center justify-center text-primary dark:text-secondary mx-auto">
+            <Lock className="w-6 h-6" />
+          </div>
+          <div className="space-y-1">
+            <h2 className="text-xl font-bold text-admin-text dark:text-white font-english uppercase tracking-wider">
+              {t("adminLogin")}
+            </h2>
+            <p className="text-[10px] text-admin-text-secondary font-light">
+              Log in with your administrator credentials to access the console
+            </p>
+          </div>
+          <form onSubmit={handleLoginSubmit} className="space-y-4 text-left">
+            <div className="space-y-1">
+              <label className="text-[10px] font-bold uppercase text-admin-text-secondary">Email Address</label>
+              <input
+                type="email"
+                required
+                placeholder="admin@lela.com"
+                value={emailInput}
+                onChange={(e) => setEmailInput(e.target.value)}
+                className="w-full px-4 py-2.5 rounded-xl border border-admin-border bg-admin-bg text-xs text-admin-text focus:outline-none focus:border-primary dark:text-white dark:border-secondary/10"
+              />
+            </div>
+            
+            <div className="space-y-1 relative">
+              <label className="text-[10px] font-bold uppercase text-admin-text-secondary font-sans">Password</label>
+              <div className="relative">
+                <input
+                  type={showPassword ? "text" : "password"}
+                  required
+                  placeholder="••••••••"
+                  value={passwordInput}
+                  onChange={(e) => setPasswordInput(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-admin-border bg-admin-bg text-xs text-admin-text focus:outline-none focus:border-primary dark:text-white pr-10 font-bold dark:border-secondary/10"
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowPassword(!showPassword)}
+                  className="absolute inset-y-0 right-3 flex items-center text-admin-text-secondary hover:text-admin-text cursor-pointer"
+                >
+                  {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+            </div>
+
+            <div className="flex items-center justify-between pt-1">
+              <label className="flex items-center gap-2 text-xs font-semibold text-admin-text-secondary cursor-pointer">
+                <input
+                  type="checkbox"
+                  checked={rememberMe}
+                  onChange={(e) => setRememberMe(e.target.checked)}
+                  className="rounded border-admin-border text-primary w-4 h-4"
+                />
+                Remember Me
+              </label>
+            </div>
+
+            <button
+              type="submit"
+              disabled={loginLoading}
+              className="w-full py-3.5 mt-2 rounded-xl bg-primary hover:bg-primary/95 text-white font-semibold text-xs tracking-wider uppercase font-english transition-all duration-300 flex items-center justify-center gap-2 cursor-pointer disabled:opacity-50"
+            >
+              {loginLoading ? (
+                <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+              ) : (
+                t("login")
+              )}
+            </button>
+          </form>
+        </div>
+      </div>
+    );
+  }
+
+  // Loaded Settings verification
+  if (!settings) {
+    return (
+      <div className="flex-1 flex items-center justify-center min-h-[60vh]">
+        <div className="w-8 h-8 rounded-full border-4 border-primary border-t-transparent animate-spin" />
+      </div>
+    );
+  }
+
+  // Dashboard calculations
+  const completedOrders = orders.filter(o => o.status === "completed" || o.status === "delivered" || o.status === "completed");
+  const totalSalesEGP = completedOrders.reduce((acc, o) => acc + (o.totalEGP || 0), 0);
+  const totalSalesYER = completedOrders.reduce((acc, o) => acc + (o.totalYER || 0), 0);
+  const lowStockCount = products.filter(p => p.stock !== undefined && p.stock <= 3).length;
+  const pendingSpecialRequests = specialOrders.filter(so => so.status === "pending").length;
+
+  const dashboardStats = {
+    productsCount: products.length,
+    ordersCount: orders.length,
+    avgPrice: Math.round(products.reduce((acc, p) => acc + p.priceEGP, 0) / (products.length || 1)),
+    totalSalesEGP,
+    totalSalesYER,
+    lowStockCount,
+    pendingSpecialRequests
+  };
+
+
 
   return (
     <div className="max-w-7xl mx-auto px-6 md:px-12 py-8 flex-1 font-sans">
