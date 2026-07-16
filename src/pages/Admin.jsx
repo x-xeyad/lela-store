@@ -38,7 +38,8 @@ import {
   Search,
   Bell,
   UserPlus,
-  FileSpreadsheet
+  FileSpreadsheet,
+  AlertTriangle
 } from "lucide-react";
 
 // ERP Services & Components
@@ -1332,22 +1333,93 @@ export const Admin = () => {
   return (
     <div className="max-w-7xl mx-auto px-6 md:px-12 py-8 flex-1 font-sans">
       {/* Header */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8 border-b border-admin-border pb-4">
+      <div className="flex flex-col md:flex-row justify-between items-center gap-4 mb-8 border-b border-admin-border pb-4">
         <div>
           <h1 className="text-2xl font-light text-admin-text tracking-wide font-english uppercase">
             {t("adminDashboard")}
           </h1>
           <span className="text-[10px] text-admin-text-secondary font-light">
-            LELA Concierge Operations
+            LELA Concierge Operations ({userRole?.toUpperCase()})
           </span>
         </div>
-        <button
-          onClick={logout}
-          className="px-4 py-2 rounded-xl border border-red-500/20 text-red-500 text-xs font-semibold uppercase tracking-wider font-english hover:bg-red-500/5 flex items-center gap-1.5 transition-all"
-        >
-          <LogOut className="w-3.5 h-3.5" />
-          {t("logout")}
-        </button>
+
+        <div className="flex flex-wrap items-center gap-3">
+          {/* Universal Search Input */}
+          <div className="relative w-44 md:w-56">
+            <input
+              type="text"
+              placeholder={language === "ar" ? "بحث شامل في النظام..." : "Search ERP..."}
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="w-full pl-8 pr-4 py-1.5 rounded-xl border border-primary/10 text-xs bg-brand-bg text-brand-text focus:outline-none focus:border-primary font-medium"
+            />
+            <Search className="w-3.5 h-3.5 absolute left-2.5 top-2.5 text-brand-text/40 animate-pulse" />
+          </div>
+
+          {/* Notifications Center */}
+          <div className="relative">
+            <button
+              onClick={() => setShowNotifications(!showNotifications)}
+              className="p-2 rounded-xl border border-primary/10 hover:bg-primary/5 text-brand-text relative cursor-pointer"
+            >
+              <Bell className="w-4 h-4" />
+              {erpNotifications.length > 0 && (
+                <span className="absolute top-1 right-1 w-1.5 h-1.5 bg-red-500 rounded-full animate-pulse" />
+              )}
+            </button>
+            
+            {showNotifications && (
+              <div className="absolute right-0 mt-2 w-72 bg-brand-card dark:bg-brand-dark-card border border-primary/15 rounded-2xl shadow-xl p-4 z-[999] space-y-2 text-[10px] text-brand-text font-medium">
+                <h5 className="font-bold text-brand-text/60 uppercase tracking-wider mb-2">System Alerts ({erpNotifications.length})</h5>
+                <div className="max-h-60 overflow-y-auto space-y-1.5">
+                  {erpNotifications.map((notif) => (
+                    <div key={notif.id} className={`p-2 rounded-xl border flex gap-1.5 items-start ${
+                      notif.severity === 'error' ? 'bg-red-500/5 border-red-500/20 text-red-600' :
+                      notif.severity === 'warning' ? 'bg-amber-500/5 border-amber-500/20 text-amber-600' : 'bg-blue-500/5 border-blue-500/20 text-blue-600'
+                    }`}>
+                      <AlertTriangle className="w-3.5 h-3.5 shrink-0" />
+                      <span>{notif.message}</span>
+                    </div>
+                  ))}
+                  {erpNotifications.length === 0 && (
+                    <p className="text-center py-4 text-brand-text/40 italic">All systems clear. No warnings active.</p>
+                  )}
+                </div>
+              </div>
+            )}
+          </div>
+
+          {/* Professional Excel Workbook Export */}
+          <button
+            onClick={() => excelExportService.exportErpLedger({
+              products,
+              orders,
+              purchases,
+              expenses,
+              suppliers,
+              representatives,
+              wholesalers,
+              wholesaleInvoices,
+              shippingCompanies,
+              treasuryTransactions,
+              currency: "EGP",
+              preparedBy: user?.email || "LELA Admin",
+              language
+            })}
+            className="px-3.5 py-1.5 rounded-xl border border-primary/20 text-primary text-xs font-bold uppercase tracking-wider hover:bg-primary/5 flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <FileSpreadsheet className="w-3.5 h-3.5" />
+            Excel Ledger
+          </button>
+
+          <button
+            onClick={logout}
+            className="px-4 py-2 rounded-xl border border-red-500/20 text-red-500 text-xs font-semibold uppercase tracking-wider font-english hover:bg-red-500/5 flex items-center gap-1.5 transition-all cursor-pointer"
+          >
+            <LogOut className="w-3.5 h-3.5" />
+            {t("logout")}
+          </button>
+        </div>
       </div>
 
       {/* Main Container */}
@@ -1372,6 +1444,90 @@ export const Admin = () => {
 
         {/* Dynamic Panel Area */}
         <main className="lg:col-span-9 bg-admin-card border border-admin-border p-6 rounded-2xl shadow-sm min-h-[50vh] transition-colors duration-550">
+          {searchQuery && searchResults ? (
+            <div className="space-y-6 animate-fade-in text-xs text-brand-text">
+              <div className="flex justify-between items-center border-b border-primary/5 pb-2">
+                <h3 className="font-bold uppercase tracking-wider text-brand-text/75">Universal Search Results</h3>
+                <button
+                  onClick={() => setSearchQuery("")}
+                  className="text-primary hover:underline font-bold"
+                >
+                  Clear Search
+                </button>
+              </div>
+              
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                {/* Products */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[10px] text-brand-text/50 uppercase tracking-widest">Products ({searchResults.products.length})</h4>
+                  <div className="space-y-1.5">
+                    {searchResults.products.map(p => (
+                      <div 
+                        key={p.id} 
+                        onClick={() => { setActiveTab("products"); setSearchQuery(""); }}
+                        className="p-2.5 rounded-xl border border-primary/5 bg-brand-bg/10 hover:bg-primary/5 cursor-pointer flex justify-between items-center"
+                      >
+                        <span className="font-semibold">{p.name?.en}</span>
+                        <span className="font-english font-bold text-primary">{p.priceEGP} EGP</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Orders */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[10px] text-brand-text/50 uppercase tracking-widest">Orders ({searchResults.orders.length})</h4>
+                  <div className="space-y-1.5">
+                    {searchResults.orders.map(o => (
+                      <div 
+                        key={o.id} 
+                        onClick={() => { setActiveTab("orders"); setSearchQuery(""); }}
+                        className="p-2.5 rounded-xl border border-primary/5 bg-brand-bg/10 hover:bg-primary/5 cursor-pointer flex justify-between items-center"
+                      >
+                        <span className="font-bold font-english">{o.id}</span>
+                        <span className="font-semibold">{o.customer?.name}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Wholesalers */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[10px] text-brand-text/50 uppercase tracking-widest">Wholesale B2B ({searchResults.wholesalers.length})</h4>
+                  <div className="space-y-1.5">
+                    {searchResults.wholesalers.map(w => (
+                      <div 
+                        key={w.id} 
+                        onClick={() => { setActiveTab("wholesalers"); setSearchQuery(""); }}
+                        className="p-2.5 rounded-xl border border-primary/5 bg-brand-bg/10 hover:bg-primary/5 cursor-pointer flex justify-between items-center"
+                      >
+                        <span className="font-semibold">{w.company_name}</span>
+                        <span className="font-english font-bold text-primary">{w.phone}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Suppliers */}
+                <div className="space-y-2">
+                  <h4 className="font-bold text-[10px] text-brand-text/50 uppercase tracking-widest">Suppliers Directory ({searchResults.suppliers.length})</h4>
+                  <div className="space-y-1.5">
+                    {searchResults.suppliers.map(s => (
+                      <div 
+                        key={s.id} 
+                        onClick={() => { setActiveTab("suppliers"); setSearchQuery(""); }}
+                        className="p-2.5 rounded-xl border border-primary/5 bg-brand-bg/10 hover:bg-primary/5 cursor-pointer flex justify-between items-center"
+                      >
+                        <span className="font-semibold">{s.name}</span>
+                        <span className="font-english font-bold text-primary">{s.phone}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <>
           
           {/* TAB 1: METRICS DASHBOARD */}
           {activeTab === "dashboard" && (
@@ -2732,6 +2888,100 @@ export const Admin = () => {
             </div>
           )}
 
+          {/* TAB: TREASURY / CASHBOX */}
+          {activeTab === "treasury" && (
+            <ErpTreasury 
+              treasuryTransactions={treasuryTransactions} 
+              loadData={loadData} 
+              settings={settings}
+              language={language} 
+            />
+          )}
+
+          {/* TAB: REPRESENTATIVES */}
+          {activeTab === "representatives" && (
+            <ErpRepresentatives 
+              representatives={representatives} 
+              orders={orders} 
+              loadData={loadData} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: WHOLESALERS & INVOICES */}
+          {activeTab === "wholesalers" && (
+            <ErpWholesalers 
+              wholesalers={wholesalers} 
+              products={products} 
+              loadData={loadData} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: USER ROLES MANAGER */}
+          {activeTab === "user_roles" && (
+            <div className="space-y-6 text-xs text-brand-text">
+              <div className="flex justify-between items-center border-b border-primary/5 pb-4">
+                <div>
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text/80">User Role Permissions Manager</h3>
+                  <p className="text-[10px] text-brand-text/50 mt-1">Configure role-based views for store dashboard log-ins</p>
+                </div>
+              </div>
+              <div className="overflow-x-auto bg-brand-card dark:bg-brand-dark-card border border-primary/5 rounded-2xl">
+                <table className="w-full text-left">
+                  <thead>
+                    <tr className="border-b border-primary/5 bg-brand-bg/25 text-brand-text/50 font-bold uppercase tracking-wider text-[9px]">
+                      <th className="p-3">User Email</th>
+                      <th className="p-3">User ID</th>
+                      <th className="p-3">Assigned Role</th>
+                      <th className="p-3 text-center">Save</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {profiles.map(p => (
+                      <tr key={p.id} className="border-b border-primary/5 hover:bg-brand-bg/5 transition-colors">
+                        <td className="p-3 font-semibold text-primary">{p.email}</td>
+                        <td className="p-3 font-english text-brand-text/50">{p.id}</td>
+                        <td className="p-3">
+                          <select
+                            defaultValue={p.role}
+                            onChange={async (e) => {
+                              try {
+                                await erpService.saveProfileRole(p.id, e.target.value);
+                                toast.success("Role updated successfully!");
+                                loadData();
+                              } catch (err) {
+                                toast.error("Failed to update role.");
+                              }
+                            }}
+                            className="px-2 py-1 rounded border border-primary/15 bg-brand-bg font-medium"
+                          >
+                            <option value="owner">Owner</option>
+                            <option value="manager">Manager</option>
+                            <option value="warehouse">Warehouse</option>
+                            <option value="accountant">Accountant</option>
+                            <option value="sales">Sales Representative</option>
+                            <option value="support">Customer Support</option>
+                          </select>
+                        </td>
+                        <td className="p-3 text-center font-bold text-green-500 font-english">Auto-saved</td>
+                      </tr>
+                    ))}
+                    {profiles.length === 0 && (
+                      <tr>
+                        <td colSpan="4" className="text-center py-8 text-brand-text/40 italic">
+                          No logged user profiles registered. Ensure other emails sign up through the login panel.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          )}
+
+          </>
+          )}
         </main>
       </div>
 
