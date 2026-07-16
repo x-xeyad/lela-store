@@ -34,7 +34,11 @@ import {
   Archive,
   TrendingDown,
   UserCheck,
-  FileText
+  FileText,
+  Search,
+  Bell,
+  UserPlus,
+  FileSpreadsheet
 } from "lucide-react";
 
 // ERP Services & Components
@@ -46,6 +50,10 @@ import { ErpShipping } from "../components/erp/ErpShipping";
 import { ErpExpenses } from "../components/erp/ErpExpenses";
 import { ErpSuppliers } from "../components/erp/ErpSuppliers";
 import { ErpReports } from "../components/erp/ErpReports";
+import { excelExportService } from "../services/excelExportService";
+import { ErpTreasury } from "../components/erp/ErpTreasury";
+import { ErpRepresentatives } from "../components/erp/ErpRepresentatives";
+import { ErpWholesalers } from "../components/erp/ErpWholesalers";
 const parseVariants = (text) => {
   if (!text) return [];
   return text.split("|").map(part => {
@@ -89,6 +97,14 @@ export const Admin = () => {
   const [expenses, setExpenses] = useState([]);
   const [shippingCompanies, setShippingCompanies] = useState([]);
   const [movements, setMovements] = useState([]);
+  const [wholesaleInvoices, setWholesaleInvoices] = useState([]);
+  const [treasuryTransactions, setTreasuryTransactions] = useState([]);
+  const [userRole, setUserRole] = useState("owner");
+  const [profiles, setProfiles] = useState([]);
+  const [representatives, setRepresentatives] = useState([]);
+  const [wholesalers, setWholesalers] = useState([]);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [showNotifications, setShowNotifications] = useState(false);
 
   // Forms States - Products
   const [editingProduct, setEditingProduct] = useState(null);
@@ -211,7 +227,12 @@ export const Admin = () => {
         suppliersList,
         expensesList,
         shippingCompaniesList,
-        movementsList
+        movementsList,
+        wholesaleInvsList,
+        treasuryTransList,
+        repsList,
+        wholesalersList,
+        profilesList
       ] = await Promise.all([
         productService.getAll(),
         orderService.getAll(),
@@ -223,7 +244,12 @@ export const Admin = () => {
         erpService.getSuppliers(),
         erpService.getExpenses(),
         erpService.getShippingCompanies(),
-        erpService.getStockMovements()
+        erpService.getStockMovements(),
+        erpService.getWholesaleInvoices(),
+        erpService.getTreasuryTransactions(),
+        erpService.getRepresentatives(),
+        erpService.getWholesalers(),
+        erpService.getProfiles()
       ]);
 
       setProducts(allProducts);
@@ -238,6 +264,27 @@ export const Admin = () => {
       setExpenses(expensesList || []);
       setShippingCompanies(shippingCompaniesList || []);
       setMovements(movementsList || []);
+      setWholesaleInvoices(wholesaleInvsList || []);
+      setTreasuryTransactions(treasuryTransList || []);
+      setRepresentatives(repsList || []);
+      setWholesalers(wholesalersList || []);
+      setProfiles(profilesList || []);
+
+      // Fetch user profile role
+      if (user) {
+        try {
+          const { data: prof, error: profErr } = await supabase
+            .from("profiles")
+            .select("role")
+            .eq("id", user.id)
+            .single();
+          if (!profErr && prof) {
+            setUserRole(prof.role);
+          }
+        } catch (e) {
+          console.warn("Failed to fetch user role:", e);
+        }
+      }
 
       // Prepopulate Forms
       setShippingForm({
@@ -1175,9 +1222,71 @@ export const Admin = () => {
     pendingSpecialRequests
   };
 
+  const erpNotifications = useMemo(() => {
+    const list = [];
+    products.forEach(p => {
+      if (p.stock <= 3) {
+        list.push({
+          id: `low_${p.id}`,
+          type: "low_stock",
+          message: `Low Stock: ${p.name?.en || 'Item'} has only ${p.stock} remaining.`,
+          severity: "warning"
+        });
+      }
+      if (p.stock < 0) {
+        list.push({
+          id: `neg_${p.id}`,
+          type: "negative_stock",
+          message: `Negative Stock: ${p.name?.en || 'Item'} is at ${p.stock}. Audit required!`,
+          severity: "error"
+        });
+      }
+    });
+
+    expenses.forEach(e => {
+      if (parseFloat(e.amount) > 50000) {
+        list.push({
+          id: `exp_${e.id}`,
+          type: "large_expense",
+          message: `Large Cost: Expense in ${e.category} exceeds 50,000 EGP.`,
+          severity: "info"
+        });
+      }
+    });
+
+    wholesalers.forEach(w => {
+      const wInvs = wholesaleInvoices.filter(i => i.wholesaler_id === w.id);
+      const totalBilled = wInvs.reduce((acc, i) => acc + parseFloat(i.total), 0);
+      if (w.credit_limit > 0 && totalBilled > w.credit_limit * 0.9) {
+        list.push({
+          id: `credit_${w.id}`,
+          type: "credit_limit",
+          message: `Credit Warning: ${w.company_name} is near credit ceiling.`,
+          severity: "warning"
+        });
+      }
+    });
+
+    return list;
+  }, [products, expenses, wholesalers, wholesaleInvoices]);
+
+  const searchResults = useMemo(() => {
+    if (!searchQuery.trim()) return null;
+    const q = searchQuery.toLowerCase();
+    
+    return {
+      products: products.filter(p => p.name?.en?.toLowerCase().includes(q) || p.name?.ar?.toLowerCase().includes(q)),
+      orders: orders.filter(o => o.id.toLowerCase().includes(q) || o.customer?.name?.toLowerCase().includes(q)),
+      suppliers: suppliers.filter(s => s.name?.toLowerCase().includes(q)),
+      wholesalers: wholesalers.filter(w => w.company_name?.toLowerCase().includes(q)),
+      expenses: expenses.filter(e => e.category?.toLowerCase().includes(q) || e.description?.toLowerCase().includes(q))
+    };
+  }, [searchQuery, products, orders, suppliers, wholesalers, expenses]);
+
   const menuItems = [
     { id: "dashboard", name: language === "ar" ? "التحليلات والمقاييس" : "Store Analytics", icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: "erp_dashboard", name: language === "ar" ? "لوحة تحكم ERP" : "ERP Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: "treasury", name: t("tabTreasury"), icon: <Archive className="w-4 h-4" /> },
     { id: "products", name: t("tabProducts"), icon: <ShoppingBag className="w-4 h-4" /> },
     { id: "categories", name: language === "ar" ? "التصنيفات" : "Categories", icon: <Layers className="w-4 h-4" /> },
     { id: "orders", name: t("tabOrders"), icon: <Receipt className="w-4 h-4" /> },
@@ -1186,7 +1295,10 @@ export const Admin = () => {
     { id: "shipping_accounting", name: language === "ar" ? "حسابات الشحن" : "Shipping Accounting", icon: <Scale className="w-4 h-4" /> },
     { id: "expenses", name: language === "ar" ? "المصاريف" : "Expenses", icon: <TrendingDown className="w-4 h-4" /> },
     { id: "suppliers", name: language === "ar" ? "الموردين" : "Suppliers", icon: <UserCheck className="w-4 h-4" /> },
+    { id: "representatives", name: t("tabRepresentatives"), icon: <UserCheck className="w-4 h-4" /> },
+    { id: "wholesalers", name: t("tabWholesalers"), icon: <UserCheck className="w-4 h-4" /> },
     { id: "reports", name: language === "ar" ? "التقارير المالية" : "Financial Reports", icon: <FileText className="w-4 h-4" /> },
+    { id: "user_roles", name: t("tabUserRoles"), icon: <UserPlus className="w-4 h-4" /> },
     { id: "specialOrders", name: language === "ar" ? "الطلبات الخاصة" : "Special Sourcing", icon: <Layers className="w-4 h-4" /> },
     { id: "coupons", name: language === "ar" ? "كوبونات الخصم" : "Coupons", icon: <Receipt className="w-4 h-4" /> },
     { id: "shipping", name: t("tabShipping"), icon: <Scale className="w-4 h-4" /> },
@@ -1194,6 +1306,28 @@ export const Admin = () => {
     { id: "faq", name: t("tabFAQ"), icon: <HelpCircle className="w-4 h-4" /> },
     { id: "reviews", name: t("tabReviews"), icon: <MessageSquare className="w-4 h-4" /> }
   ];
+
+  const filteredMenuItems = useMemo(() => {
+    return menuItems.filter(item => {
+      if (userRole === "owner") return true;
+      if (userRole === "manager") {
+        return item.id !== "user_roles";
+      }
+      if (userRole === "warehouse") {
+        return ["products", "inventory", "shipping_accounting", "orders"].includes(item.id);
+      }
+      if (userRole === "accountant") {
+        return ["dashboard", "erp_dashboard", "products", "inventory", "shipping_accounting", "expenses", "suppliers", "reports", "representatives", "wholesalers", "treasury"].includes(item.id);
+      }
+      if (userRole === "sales") {
+        return ["products", "orders", "wholesalers", "representatives"].includes(item.id);
+      }
+      if (userRole === "support") {
+        return ["orders", "faq", "reviews"].includes(item.id);
+      }
+      return false;
+    });
+  }, [menuItems, userRole]);
 
   return (
     <div className="max-w-7xl mx-auto px-6 md:px-12 py-8 flex-1 font-sans">
@@ -1220,7 +1354,7 @@ export const Admin = () => {
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8 items-start">
         {/* Navigation Sidebar */}
         <nav className="lg:col-span-3 space-y-1 bg-admin-card border border-admin-border p-4 rounded-2xl shadow-sm">
-          {menuItems.map((item) => (
+          {filteredMenuItems.map((item) => (
             <button
               key={item.id}
               onClick={() => setActiveTab(item.id)}

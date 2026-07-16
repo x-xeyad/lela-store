@@ -180,7 +180,45 @@ export const translations = {
     hajjah: "Hajjah",
     albayda: "Al-Bayda",
     almahrah: "Al-Mahrah",
-    socotra: "Socotra"
+    socotra: "Socotra",
+    
+    // ERP Expansion Tab Labels
+    tabTreasury: "Treasury / Cashbox",
+    tabRepresentatives: "Sales Reps",
+    tabWholesalers: "Wholesale B2B",
+    tabInvoices: "Wholesale Invoices",
+    tabCostHistory: "Costing History",
+    tabUserRoles: "User Roles",
+    
+    // Treasury
+    cashIn: "Cash In",
+    cashOut: "Cash Out",
+    deposit: "Deposit",
+    withdrawal: "Withdrawal",
+    openingBalance: "Opening Balance",
+    closingBalance: "Closing Balance",
+    cashBalance: "Cash Balance",
+    
+    // Representatives
+    repCommission: "Commission Earned",
+    repPaid: "Commission Paid",
+    repRemaining: "Remaining Commission",
+    commissionType: "Commission Type",
+    commissionValue: "Commission Value",
+    percentage: "Percentage",
+    fixedAmount: "Fixed Amount",
+    
+    // Wholesale
+    wholesaler: "Wholesaler",
+    companyName: "Company Name",
+    contactPerson: "Contact Person",
+    creditLimit: "Credit Limit",
+    customDiscount: "Custom Discount",
+    taxNumber: "Tax Number",
+    specialPrices: "Special Prices",
+    wholesaleInvoices: "Wholesale Invoices",
+    invoiceNumber: "Invoice Number",
+    paymentDueDate: "Payment Due Date"
   },
   ar: {
     // Nav & General
@@ -363,6 +401,44 @@ export const translations = {
     hajjah: "حجة",
     albayda: "البيضاء",
     almahrah: "المهرة",
-    socotra: "سقطرى"
+    socotra: "سقطرى",
+    
+    // ERP Expansion Tab Labels
+    tabTreasury: "الخزينة والصندوق",
+    tabRepresentatives: "المناديب والعمولات",
+    tabWholesalers: "عملاء الجملة B2B",
+    tabInvoices: "فواتير الجملة",
+    tabCostHistory: "سجل تكلفة المنتج",
+    tabUserRoles: "الصلاحيات والأدوار",
+    
+    // Treasury
+    cashIn: "مقبوضات (داخل)",
+    cashOut: "مصروفات (خارج)",
+    deposit: "إيداع",
+    withdrawal: "سحب",
+    openingBalance: "رصيد افتتاحى",
+    closingBalance: "رصيد إغلاق",
+    cashBalance: "رصيد الخزينة الحالي",
+    
+    // Representatives
+    repCommission: "إجمالي العمولات المستحقة",
+    repPaid: "العمولات المدفوعة",
+    repRemaining: "العمولات المتبقية",
+    commissionType: "نوع العمولة",
+    commissionValue: "قيمة العمولة",
+    percentage: "نسبة مئوية",
+    fixedAmount: "مبلغ ثابت",
+    
+    // Wholesale
+    wholesaler: "عميل جملة",
+    companyName: "اسم الشركة",
+    contactPerson: "الشخص المسؤول",
+    creditLimit: "الحد الائتماني",
+    customDiscount: "خصم خاص (%)",
+    taxNumber: "الرقم الضريبي",
+    specialPrices: "أسعار خاصة للمنتجات",
+    wholesaleInvoices: "فواتير الجملة B2B",
+    invoiceNumber: "رقم الفاتورة",
+    paymentDueDate: "تاريخ الاستحقاق"
   }
 };
