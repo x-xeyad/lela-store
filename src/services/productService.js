@@ -22,7 +22,10 @@ const mapProductFromDb = (p) => {
     rating: parseFloat(p.rating !== undefined ? p.rating : 5.0),
     reviewsCount: parseInt(p.reviews_count !== undefined ? p.reviews_count : p.reviewsCount || 0, 10),
     discountType: p.discount_type || "none",
-    discountValue: parseFloat(p.discount_value !== undefined ? p.discount_value : 0)
+    discountValue: parseFloat(p.discount_value !== undefined ? p.discount_value : 0),
+    purchaseCost: parseFloat(p.purchase_cost !== undefined ? p.purchase_cost : p.purchaseCost || 0),
+    packagingCost: parseFloat(p.packaging_cost !== undefined ? p.packaging_cost : p.packagingCost || 0),
+    shippingCost: parseFloat(p.shipping_cost !== undefined ? p.shipping_cost : p.shippingCost || 0)
   };
 };
 
@@ -47,7 +50,10 @@ const mapProductToDb = (p) => {
     rating: p.rating,
     reviews_count: p.reviewsCount,
     discount_type: p.discountType || "none",
-    discount_value: p.discountValue || 0
+    discount_value: p.discountValue || 0,
+    purchase_cost: p.purchaseCost !== undefined ? p.purchaseCost : 0,
+    packaging_cost: p.packagingCost !== undefined ? p.packagingCost : 0,
+    shipping_cost: p.shippingCost !== undefined ? p.shippingCost : 0
   };
 };
 

@@ -78,14 +78,49 @@ export const orderService = {
 
   create: async (orderData) => {
     try {
+      const orderId = "ORD-" + Math.floor(100000 + Math.random() * 900000);
+      
+      // Calculate order shipping cost from shipping_companies table
+      let calculatedShippingEGP = 0;
+      try {
+        const customerGov = (orderData.customer?.governorate || "sanaa").toLowerCase();
+        // Fetch shipping companies
+        const { data: carriers } = await supabase
+          .from("shipping_companies")
+          .select("*");
+        
+        // Find carrier matching customer city
+        const carrier = (carriers || []).find(
+          c => c.city.toLowerCase() === customerGov || customerGov.includes(c.city.toLowerCase())
+        );
+
+        const totalWeight = (orderData.items || []).reduce(
+          (acc, item) => acc + (parseFloat(item.product?.weight || 0.5) * parseInt(item.quantity || 1, 10)),
+          0
+        );
+
+        if (carrier) {
+          calculatedShippingEGP = (totalWeight * parseFloat(carrier.cost_per_kg)) + parseFloat(carrier.fixed_fees || 0) + parseFloat(carrier.extra_fees || 0);
+        } else {
+          // Fallback to storefront default rate
+          const isPersonal = (orderData.items || []).some(item => item.product?.category === "Personal Care");
+          const defaultRatePerKg = isPersonal ? 450 : 300;
+          calculatedShippingEGP = totalWeight * defaultRatePerKg;
+        }
+      } catch (err) {
+        console.warn("Failed to automatically calculate ERP shipping cost:", err);
+      }
+
       const newOrder = {
         ...orderData,
-        id: "ORD-" + Math.floor(100000 + Math.random() * 900000),
+        id: orderId,
         status: "pending",
         createdAt: new Date().toISOString()
       };
 
       const dbPayload = mapOrderToDb(newOrder);
+      dbPayload.shipping_cost_egp = calculatedShippingEGP; // Store on order
+
       const { data, error } = await supabase
         .from("orders")
         .insert([dbPayload])
@@ -96,6 +131,45 @@ export const orderService = {
         console.error("Supabase order creation error:", error.message);
         throw error;
       }
+
+      // Deduct inventory and log movements for each item
+      for (const item of (orderData.items || [])) {
+        try {
+          const productId = item.product?.id;
+          const qty = parseInt(item.quantity || 1, 10);
+          if (productId) {
+            // Fetch current stock
+            const { data: prodData } = await supabase
+              .from("products")
+              .select("stock")
+              .eq("id", productId)
+              .single();
+            
+            const currentStock = parseInt(prodData?.stock || 0, 10);
+            const newStock = Math.max(0, currentStock - qty);
+
+            // Update product stock
+            await supabase
+              .from("products")
+              .update({ stock: newStock })
+              .eq("id", productId);
+
+            // Log stock movement
+            await supabase
+              .from("stock_movements")
+              .insert([{
+                product_id: productId,
+                movement_type: "sale",
+                quantity: -qty, // negative for sale
+                description: `Storefront order checkout. Order ID: ${orderId}`,
+                reference_id: orderId
+              }]);
+          }
+        } catch (itemErr) {
+          console.warn("Failed to update inventory for order item:", itemErr);
+        }
+      }
+
       return mapOrderFromDb(data);
     } catch (e) {
       console.error("Exception in create order:", e);
@@ -105,6 +179,13 @@ export const orderService = {
 
   updateStatus: async (id, status) => {
     try {
+      // Get current order status before updating to check if we are transitioning to cancelled
+      const { data: currentOrder } = await supabase
+        .from("orders")
+        .select("status, items")
+        .eq("id", id)
+        .single();
+
       const { data, error } = await supabase
         .from("orders")
         .update({ status })
@@ -116,6 +197,47 @@ export const orderService = {
         console.error(`Supabase order status update error for id "${id}":`, error.message);
         throw error;
       }
+
+      // If transition to cancelled: return stock
+      if (status === "cancelled" && currentOrder && currentOrder.status !== "cancelled") {
+        const items = currentOrder.items || [];
+        for (const item of items) {
+          try {
+            const productId = item.product?.id;
+            const qty = parseInt(item.quantity || 1, 10);
+            if (productId) {
+              const { data: prodData } = await supabase
+                .from("products")
+                .select("stock")
+                .eq("id", productId)
+                .single();
+              
+              const currentStock = parseInt(prodData?.stock || 0, 10);
+              const newStock = currentStock + qty;
+
+              // Restore stock
+              await supabase
+                .from("products")
+                .update({ stock: newStock })
+                .eq("id", productId);
+
+              // Log stock movement
+              await supabase
+                .from("stock_movements")
+                .insert([{
+                  product_id: productId,
+                  movement_type: "order_cancelled",
+                  quantity: qty,
+                  description: `Order cancelled. Returned to stock. Order ID: ${id}`,
+                  reference_id: id
+                }]);
+            }
+          } catch (restoreErr) {
+            console.warn("Failed to restore stock for cancelled order:", restoreErr);
+          }
+        }
+      }
+
       return mapOrderFromDb(data);
     } catch (e) {
       console.error(`Exception in updateStatus order for id "${id}":`, e);

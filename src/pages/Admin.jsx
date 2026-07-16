@@ -29,8 +29,23 @@ import {
   Layers,
   Download,
   Eye,
-  EyeOff
+  EyeOff,
+  Coins,
+  Archive,
+  TrendingDown,
+  UserCheck,
+  FileText
 } from "lucide-react";
+
+// ERP Services & Components
+import { erpService } from "../services/erpService";
+import { ErpDashboard } from "../components/erp/ErpDashboard";
+import { ErpPurchases } from "../components/erp/ErpPurchases";
+import { ErpInventory } from "../components/erp/ErpInventory";
+import { ErpShipping } from "../components/erp/ErpShipping";
+import { ErpExpenses } from "../components/erp/ErpExpenses";
+import { ErpSuppliers } from "../components/erp/ErpSuppliers";
+import { ErpReports } from "../components/erp/ErpReports";
 const parseVariants = (text) => {
   if (!text) return [];
   return text.split("|").map(part => {
@@ -68,6 +83,13 @@ export const Admin = () => {
   const [orders, setOrders] = useState([]);
   const [settings, setSettings] = useState(null);
 
+  // ERP Accounting & Inventory Lists
+  const [purchases, setPurchases] = useState([]);
+  const [suppliers, setSuppliers] = useState([]);
+  const [expenses, setExpenses] = useState([]);
+  const [shippingCompanies, setShippingCompanies] = useState([]);
+  const [movements, setMovements] = useState([]);
+
   // Forms States - Products
   const [editingProduct, setEditingProduct] = useState(null);
   const [showProductModal, setShowProductModal] = useState(false);
@@ -90,7 +112,9 @@ export const Admin = () => {
     tagsText: "new",
     discountType: "none",
     discountValue: "0",
-    variantsText: ""
+    variantsText: "",
+    purchaseCost: "",
+    packagingCost: ""
   });
 
   // Forms States - Shipping & Settings
@@ -176,13 +200,30 @@ export const Admin = () => {
   // Load all admin data
   const loadData = async () => {
     try {
-      const [allProducts, allOrders, allSettings, categoriesList, faqsList, reviewsList] = await Promise.all([
+      const [
+        allProducts, 
+        allOrders, 
+        allSettings, 
+        categoriesList, 
+        faqsList, 
+        reviewsList,
+        purchasesList,
+        suppliersList,
+        expensesList,
+        shippingCompaniesList,
+        movementsList
+      ] = await Promise.all([
         productService.getAll(),
         orderService.getAll(),
         settingsService.get(),
         settingsService.getCategories(),
         settingsService.getFaqs(),
-        settingsService.getReviews()
+        settingsService.getReviews(),
+        erpService.getPurchases(),
+        erpService.getSuppliers(),
+        erpService.getExpenses(),
+        erpService.getShippingCompanies(),
+        erpService.getStockMovements()
       ]);
 
       setProducts(allProducts);
@@ -192,6 +233,11 @@ export const Admin = () => {
         allSettings.reviews = reviewsList || [];
       }
       setSettings(allSettings);
+      setPurchases(purchasesList || []);
+      setSuppliers(suppliersList || []);
+      setExpenses(expensesList || []);
+      setShippingCompanies(shippingCompaniesList || []);
+      setMovements(movementsList || []);
 
       // Prepopulate Forms
       setShippingForm({
@@ -364,7 +410,9 @@ export const Admin = () => {
       tagsText: "new",
       discountType: "none",
       discountValue: "0",
-      variantsText: ""
+      variantsText: "",
+      purchaseCost: "",
+      packagingCost: ""
     });
     setShowProductModal(true);
   };
@@ -390,7 +438,9 @@ export const Admin = () => {
       tagsText: (prod.tags || []).join(", "),
       discountType: prod.discountType || "none",
       discountValue: (prod.discountValue !== undefined ? prod.discountValue : 0).toString(),
-      variantsText: serializeVariants(prod.variants)
+      variantsText: serializeVariants(prod.variants),
+      purchaseCost: (prod.purchaseCost !== undefined ? prod.purchaseCost : Math.round(prod.costEGP * 0.8)).toString(),
+      packagingCost: (prod.packagingCost !== undefined ? prod.packagingCost : 0).toString()
     });
     setShowProductModal(true);
   };
@@ -454,17 +504,28 @@ export const Admin = () => {
     const colorList = productForm.colorsText.split(",").map(c => c.trim()).filter(Boolean);
     const tagList = productForm.tagsText.split(",").map(t => t.trim()).filter(Boolean);
 
-    const cost = parseFloat(productForm.costEGP || 0);
-    const profit = parseFloat(productForm.profitEGP || 0);
+    const purchaseCostVal = parseFloat(productForm.purchaseCost || 0);
+    const packagingCostVal = parseFloat(productForm.packagingCost || 0);
+    const weightVal = parseFloat(productForm.weight || 0.5);
+    const profitVal = parseFloat(productForm.profitEGP || 0);
+    
+    // Automatically calculate shipping cost per KG based on category
+    const ratePerKg = productForm.category === "Personal Care"
+      ? (settings?.shippingRates?.personalCare || 450)
+      : (settings?.shippingRates?.clothingHome || 300);
+    const shippingCostVal = ratePerKg * weightVal;
+    
+    const costEGPVal = purchaseCostVal + shippingCostVal + packagingCostVal;
+    const priceEGPVal = costEGPVal + profitVal;
 
     const productPayload = {
       name: { en: productForm.nameEn, ar: productForm.nameAr },
       description: { en: productForm.descEn, ar: productForm.descAr },
       category: productForm.category,
-      costEGP: cost,
-      profitEGP: profit,
-      priceEGP: cost + profit,
-      weight: parseFloat(productForm.weight || 0.5),
+      costEGP: costEGPVal,
+      profitEGP: profitVal,
+      priceEGP: priceEGPVal,
+      weight: weightVal,
       images: imageList.length > 0 ? imageList : ["https://images.unsplash.com/photo-1584917865442-de89df76afd3"],
       featured: productForm.featured,
       sizes: sizeList,
@@ -474,7 +535,10 @@ export const Admin = () => {
       tags: tagList,
       discountType: productForm.discountType || "none",
       discountValue: parseFloat(productForm.discountValue || 0),
-      variants: parseVariants(productForm.variantsText)
+      variants: parseVariants(productForm.variantsText),
+      purchaseCost: purchaseCostVal,
+      packagingCost: packagingCostVal,
+      shippingCost: shippingCostVal
     };
 
     try {
@@ -1112,10 +1176,17 @@ export const Admin = () => {
   };
 
   const menuItems = [
-    { id: "dashboard", name: t("tabDashboard"), icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: "dashboard", name: language === "ar" ? "التحليلات والمقاييس" : "Store Analytics", icon: <LayoutDashboard className="w-4 h-4" /> },
+    { id: "erp_dashboard", name: language === "ar" ? "لوحة تحكم ERP" : "ERP Dashboard", icon: <LayoutDashboard className="w-4 h-4" /> },
     { id: "products", name: t("tabProducts"), icon: <ShoppingBag className="w-4 h-4" /> },
     { id: "categories", name: language === "ar" ? "التصنيفات" : "Categories", icon: <Layers className="w-4 h-4" /> },
     { id: "orders", name: t("tabOrders"), icon: <Receipt className="w-4 h-4" /> },
+    { id: "purchases", name: language === "ar" ? "المشتريات" : "Purchases", icon: <Coins className="w-4 h-4" /> },
+    { id: "inventory", name: language === "ar" ? "المخزون والتحكم" : "Inventory Ledger", icon: <Archive className="w-4 h-4" /> },
+    { id: "shipping_accounting", name: language === "ar" ? "حسابات الشحن" : "Shipping Accounting", icon: <Scale className="w-4 h-4" /> },
+    { id: "expenses", name: language === "ar" ? "المصاريف" : "Expenses", icon: <TrendingDown className="w-4 h-4" /> },
+    { id: "suppliers", name: language === "ar" ? "الموردين" : "Suppliers", icon: <UserCheck className="w-4 h-4" /> },
+    { id: "reports", name: language === "ar" ? "التقارير المالية" : "Financial Reports", icon: <FileText className="w-4 h-4" /> },
     { id: "specialOrders", name: language === "ar" ? "الطلبات الخاصة" : "Special Sourcing", icon: <Layers className="w-4 h-4" /> },
     { id: "coupons", name: language === "ar" ? "كوبونات الخصم" : "Coupons", icon: <Receipt className="w-4 h-4" /> },
     { id: "shipping", name: t("tabShipping"), icon: <Scale className="w-4 h-4" /> },
@@ -1362,6 +1433,79 @@ export const Admin = () => {
                 </div>
               </div>
             </div>
+          )}
+
+          {/* TAB: ERP DASHBOARD */}
+          {activeTab === "erp_dashboard" && (
+            <ErpDashboard 
+              products={products} 
+              orders={orders} 
+              purchases={purchases} 
+              expenses={expenses} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: PURCHASES */}
+          {activeTab === "purchases" && (
+            <ErpPurchases 
+              products={products} 
+              suppliers={suppliers} 
+              purchases={purchases} 
+              loadData={loadData} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: INVENTORY */}
+          {activeTab === "inventory" && (
+            <ErpInventory 
+              products={products} 
+              orders={orders} 
+              purchases={purchases} 
+              movements={movements} 
+              loadData={loadData} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: SHIPPING ACCOUNTING */}
+          {activeTab === "shipping_accounting" && (
+            <ErpShipping 
+              shippingCompanies={shippingCompanies} 
+              loadData={loadData} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: EXPENSES */}
+          {activeTab === "expenses" && (
+            <ErpExpenses 
+              expenses={expenses} 
+              loadData={loadData} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: SUPPLIERS */}
+          {activeTab === "suppliers" && (
+            <ErpSuppliers 
+              suppliers={suppliers} 
+              purchases={purchases} 
+              loadData={loadData} 
+              language={language} 
+            />
+          )}
+
+          {/* TAB: FINANCIAL REPORTS */}
+          {activeTab === "reports" && (
+            <ErpReports 
+              products={products} 
+              orders={orders} 
+              purchases={purchases} 
+              expenses={expenses} 
+              language={language} 
+            />
           )}
 
           {/* TAB 2: PRODUCTS CRUD */}
@@ -2518,54 +2662,65 @@ export const Admin = () => {
                 </div>
               </div>
 
-               <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-brand-text/60">Category</label>
-                  <select
-                    value={productForm.category}
-                    onChange={(e) => setProductForm(prev => ({ ...prev, category: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-xl border border-primary/10 text-xs bg-admin-bg text-admin-text"
-                  >
-                    {categories.map((c) => (
-                      <option key={c.id} value={c.name.en}>
-                        {c.name.en}
-                      </option>
-                    ))}
-                    {categories.length === 0 && (
-                      <>
-                        <option value="Personal Care">Personal Care</option>
-                        <option value="Clothing">Clothing</option>
-                        <option value="Home Products">Home Products</option>
-                        <option value="Accessories">Accessories</option>
-                        <option value="Kids">Kids</option>
-                        <option value="Electronics">Electronics</option>
-                      </>
-                    )}
-                  </select>
+                <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-brand-text/60">Category</label>
+                    <select
+                      value={productForm.category}
+                      onChange={(e) => setProductForm(prev => ({ ...prev, category: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-xl border border-primary/10 text-xs bg-admin-bg text-admin-text font-medium"
+                    >
+                      {categories.map((c) => (
+                        <option key={c.id} value={c.name.en}>
+                          {c.name.en}
+                        </option>
+                      ))}
+                      {categories.length === 0 && (
+                        <>
+                          <option value="Personal Care">Personal Care</option>
+                          <option value="Clothing">Clothing</option>
+                          <option value="Home Products">Home Products</option>
+                          <option value="Accessories">Accessories</option>
+                          <option value="Kids">Kids</option>
+                          <option value="Electronics">Electronics</option>
+                        </>
+                      )}
+                    </select>
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-brand-text/60">Purchase Cost (EGP)</label>
+                    <input
+                      type="number"
+                      required
+                      value={productForm.purchaseCost}
+                      placeholder="e.g. 800"
+                      onChange={(e) => setProductForm(prev => ({ ...prev, purchaseCost: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-xl border border-primary/10 text-xs font-english bg-admin-bg text-admin-text"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-brand-text/60">Packaging Cost (EGP)</label>
+                    <input
+                      type="number"
+                      required
+                      value={productForm.packagingCost}
+                      placeholder="e.g. 50"
+                      onChange={(e) => setProductForm(prev => ({ ...prev, packagingCost: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-xl border border-primary/10 text-xs font-english bg-admin-bg text-admin-text"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-[10px] font-bold uppercase text-brand-text/60">Cairo Profit Margin (EGP)</label>
+                    <input
+                      type="number"
+                      required
+                      value={productForm.profitEGP}
+                      placeholder="e.g. 300"
+                      onChange={(e) => setProductForm(prev => ({ ...prev, profitEGP: e.target.value }))}
+                      className="w-full px-4 py-2 rounded-xl border border-primary/10 text-xs font-english bg-admin-bg text-admin-text"
+                    />
+                  </div>
                 </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-brand-text/60">Cost Price (EGP)</label>
-                  <input
-                    type="number"
-                    required
-                    value={productForm.costEGP}
-                    placeholder="e.g. 1000"
-                    onChange={(e) => setProductForm(prev => ({ ...prev, costEGP: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-xl border border-primary/10 text-xs font-english bg-admin-bg text-admin-text"
-                  />
-                </div>
-                <div className="space-y-1">
-                  <label className="text-[10px] font-bold uppercase text-brand-text/60">Profit Margin (EGP)</label>
-                  <input
-                    type="number"
-                    required
-                    value={productForm.profitEGP}
-                    placeholder="e.g. 300"
-                    onChange={(e) => setProductForm(prev => ({ ...prev, profitEGP: e.target.value }))}
-                    className="w-full px-4 py-2 rounded-xl border border-primary/10 text-xs font-english bg-admin-bg text-admin-text"
-                  />
-                </div>
-              </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-4 gap-4">
                 <div className="space-y-1">
@@ -2615,40 +2770,66 @@ export const Admin = () => {
 
               {/* Real-time Smart Pricing Calculator Panel */}
               {(() => {
-                const cost = parseFloat(productForm.costEGP || 0);
+                const purchaseCost = parseFloat(productForm.purchaseCost || 0);
+                const packagingCost = parseFloat(productForm.packagingCost || 0);
                 const profit = parseFloat(productForm.profitEGP || 0);
                 const weight = parseFloat(productForm.weight || 0.5);
+                
                 const ratePerKg = productForm.category === "Personal Care"
                   ? (settings?.shippingRates?.personalCare || 450)
                   : (settings?.shippingRates?.clothingHome || 300);
                 const shipCostEGP = ratePerKg * weight;
-                const basePriceEGP = cost + profit;
-                const finalPriceEGP = basePriceEGP + shipCostEGP;
+                
+                const totalCostEGP = purchaseCost + shipCostEGP + packagingCost;
+                const sellingPriceEGP = totalCostEGP + profit;
+                const grossProfitEGP = sellingPriceEGP - purchaseCost;
+                const netProfitEGP = sellingPriceEGP - totalCostEGP;
+                const profitMarginPercent = sellingPriceEGP > 0 ? (netProfitEGP / sellingPriceEGP) * 100 : 0;
+
                 const egpToYer = settings?.currency?.egpToYerRate || 11.5;
                 const yerToSar = settings?.currency?.yerToSarRate || 140;
-                const priceYER = Math.round(finalPriceEGP * egpToYer);
+                const priceYER = Math.round(sellingPriceEGP * egpToYer);
                 const priceSAR = Math.round(priceYER / yerToSar);
+                
                 return (
-                  <div className="p-4 rounded-2xl bg-primary/5 dark:bg-brand-dark-bg/40 border border-primary/10 dark:border-secondary/15 space-y-2 text-xs">
+                  <div className="p-4 rounded-2xl bg-primary/5 dark:bg-brand-dark-bg/40 border border-primary/10 dark:border-secondary/15 space-y-3 text-xs">
                     <h4 className="text-[10px] font-bold uppercase text-primary dark:text-secondary tracking-wider">
-                      Real-Time Smart Pricing Estimate
+                      Real-Time Smart ERP Costing & Pricing Calculator
                     </h4>
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-light text-[10px] border-b border-primary/5 pb-2">
+                      <div>
+                        <span className="text-brand-text/50 block">Purchase Cost:</span>
+                        <span className="font-bold font-english text-brand-text dark:text-brand-dark-text">{purchaseCost.toLocaleString()} EGP</span>
+                      </div>
+                      <div>
+                        <span className="text-brand-text/50 block">Est. Sourcing Shipping:</span>
+                        <span className="font-bold font-english text-brand-text dark:text-brand-dark-text">{Math.round(shipCostEGP).toLocaleString()} EGP</span>
+                      </div>
+                      <div>
+                        <span className="text-brand-text/50 block">Packaging Cost:</span>
+                        <span className="font-bold font-english text-brand-text dark:text-brand-dark-text">{packagingCost.toLocaleString()} EGP</span>
+                      </div>
+                      <div>
+                        <span className="text-brand-text/50 block">Total Unit Cost:</span>
+                        <span className="font-extrabold font-english text-primary dark:text-secondary">{totalCostEGP.toLocaleString()} EGP</span>
+                      </div>
+                    </div>
                     <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 font-light text-[10px]">
                       <div>
-                        <span className="text-brand-text/50">Est. Shipping:</span>
-                        <p className="font-bold text-brand-text dark:text-brand-dark-text mt-0.5">{Math.round(shipCostEGP).toLocaleString()} EGP</p>
+                        <span className="text-brand-text/50 block">Selling Price (Customer):</span>
+                        <span className="font-extrabold font-english text-primary dark:text-secondary">{sellingPriceEGP.toLocaleString()} EGP</span>
                       </div>
                       <div>
-                        <span className="text-brand-text/50">Base Price (Cost+Margin):</span>
-                        <p className="font-bold text-brand-text dark:text-brand-dark-text mt-0.5">{Math.round(basePriceEGP).toLocaleString()} EGP</p>
+                        <span className="text-brand-text/50 block">Gross Profit / Net Profit:</span>
+                        <span className="font-bold font-english text-green-500">{grossProfitEGP.toLocaleString()} EGP / {netProfitEGP.toLocaleString()} EGP</span>
                       </div>
                       <div>
-                        <span className="text-brand-text/50">Final Customer Price:</span>
-                        <p className="font-bold text-primary dark:text-secondary mt-0.5">{Math.round(finalPriceEGP).toLocaleString()} EGP</p>
+                        <span className="text-brand-text/50 block">Profit Margin:</span>
+                        <span className="font-bold font-english text-green-500">{profitMarginPercent.toFixed(1)}%</span>
                       </div>
                       <div>
-                        <span className="text-brand-text/50">Yemen Conversions:</span>
-                        <p className="font-bold text-brand-text dark:text-brand-dark-text mt-0.5">{priceYER.toLocaleString()} YER / {priceSAR.toLocaleString()} SAR</p>
+                        <span className="text-brand-text/50 block">Yemen Conversions:</span>
+                        <span className="font-bold font-english text-brand-text dark:text-brand-dark-text">{priceYER.toLocaleString()} YER / {priceSAR.toLocaleString()} SAR</span>
                       </div>
                     </div>
                   </div>
