@@ -274,13 +274,12 @@ export const Admin = () => {
       // Fetch user profile role
       if (user) {
         try {
-          const { data: prof, error: profErr } = await supabase
+          const { data: profs, error: profErr } = await supabase
             .from("profiles")
             .select("role")
-            .eq("id", user.id)
-            .single();
-          if (!profErr && prof) {
-            setUserRole(prof.role);
+            .eq("id", user.id);
+          if (!profErr && profs && profs.length > 0) {
+            setUserRole(profs[0].role);
           }
         } catch (e) {
           console.warn("Failed to fetch user role:", e);
