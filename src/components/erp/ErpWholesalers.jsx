@@ -217,7 +217,7 @@ export const ErpWholesalers = ({ wholesalers, products, loadData, language = "en
         invoiceCount: wholesalerInvs.length,
         totalBilled
       };
-    }), [wholesalers, invoices];
+    });
   }, [wholesalers, invoices]);
 
   // Invoice builder helpers

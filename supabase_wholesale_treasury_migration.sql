@@ -7,6 +7,8 @@ CREATE TABLE IF NOT EXISTS public.profiles (
 );
 
 ALTER TABLE public.profiles ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on profiles" ON public.profiles;
+DROP POLICY IF EXISTS "Allow write access for owners on profiles" ON public.profiles;
 CREATE POLICY "Allow public select on profiles" ON public.profiles FOR SELECT USING (true);
 CREATE POLICY "Allow write access for owners on profiles" ON public.profiles FOR ALL USING (true);
 
@@ -38,6 +40,8 @@ CREATE TABLE IF NOT EXISTS public.treasury_transactions (
 );
 
 ALTER TABLE public.treasury_transactions ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on treasury" ON public.treasury_transactions;
+DROP POLICY IF EXISTS "Allow write access for admins on treasury" ON public.treasury_transactions;
 CREATE POLICY "Allow public select on treasury" ON public.treasury_transactions FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on treasury" ON public.treasury_transactions FOR ALL USING (true);
 
@@ -55,6 +59,8 @@ CREATE TABLE IF NOT EXISTS public.representatives (
 );
 
 ALTER TABLE public.representatives ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on representatives" ON public.representatives;
+DROP POLICY IF EXISTS "Allow write access for admins on representatives" ON public.representatives;
 CREATE POLICY "Allow public select on representatives" ON public.representatives FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on representatives" ON public.representatives FOR ALL USING (true);
 
@@ -70,6 +76,8 @@ CREATE TABLE IF NOT EXISTS public.representative_payments (
 );
 
 ALTER TABLE public.representative_payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on representative_payments" ON public.representative_payments;
+DROP POLICY IF EXISTS "Allow write access for admins on representative_payments" ON public.representative_payments;
 CREATE POLICY "Allow public select on representative_payments" ON public.representative_payments FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on representative_payments" ON public.representative_payments FOR ALL USING (true);
 
@@ -94,6 +102,8 @@ CREATE TABLE IF NOT EXISTS public.wholesalers (
 );
 
 ALTER TABLE public.wholesalers ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on wholesalers" ON public.wholesalers;
+DROP POLICY IF EXISTS "Allow write access for admins on wholesalers" ON public.wholesalers;
 CREATE POLICY "Allow public select on wholesalers" ON public.wholesalers FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on wholesalers" ON public.wholesalers FOR ALL USING (true);
 
@@ -108,6 +118,8 @@ CREATE TABLE IF NOT EXISTS public.wholesaler_prices (
 );
 
 ALTER TABLE public.wholesaler_prices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on wholesaler_prices" ON public.wholesaler_prices;
+DROP POLICY IF EXISTS "Allow write access for admins on wholesaler_prices" ON public.wholesaler_prices;
 CREATE POLICY "Allow public select on wholesaler_prices" ON public.wholesaler_prices FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on wholesaler_prices" ON public.wholesaler_prices FOR ALL USING (true);
 
@@ -126,6 +138,8 @@ CREATE TABLE IF NOT EXISTS public.wholesale_invoices (
 );
 
 ALTER TABLE public.wholesale_invoices ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on wholesale_invoices" ON public.wholesale_invoices;
+DROP POLICY IF EXISTS "Allow write access for admins on wholesale_invoices" ON public.wholesale_invoices;
 CREATE POLICY "Allow public select on wholesale_invoices" ON public.wholesale_invoices FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on wholesale_invoices" ON public.wholesale_invoices FOR ALL USING (true);
 
@@ -142,6 +156,8 @@ CREATE TABLE IF NOT EXISTS public.wholesale_payments (
 );
 
 ALTER TABLE public.wholesale_payments ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on wholesale_payments" ON public.wholesale_payments;
+DROP POLICY IF EXISTS "Allow write access for admins on wholesale_payments" ON public.wholesale_payments;
 CREATE POLICY "Allow public select on wholesale_payments" ON public.wholesale_payments FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on wholesale_payments" ON public.wholesale_payments FOR ALL USING (true);
 
@@ -159,6 +175,8 @@ CREATE TABLE IF NOT EXISTS public.product_cost_history (
 );
 
 ALTER TABLE public.product_cost_history ENABLE ROW LEVEL SECURITY;
+DROP POLICY IF EXISTS "Allow public select on product_cost_history" ON public.product_cost_history;
+DROP POLICY IF EXISTS "Allow write access for admins on product_cost_history" ON public.product_cost_history;
 CREATE POLICY "Allow public select on product_cost_history" ON public.product_cost_history FOR SELECT USING (true);
 CREATE POLICY "Allow write access for admins on product_cost_history" ON public.product_cost_history FOR ALL USING (true);
 
