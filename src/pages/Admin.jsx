@@ -31,6 +31,7 @@ import {
   Eye,
   EyeOff,
   Coins,
+  Sparkles,
   Archive,
   TrendingDown,
   UserCheck,
@@ -195,6 +196,29 @@ export const Admin = () => {
   const [maintenanceMode, setMaintenanceMode] = useState(false);
   const [seoForm, setSeoForm] = useState({ title: "", description: "", keywords: "" });
 
+  // Announcements, Why LELA, and How It Works states
+  const [announcementConfig, setAnnouncementConfig] = useState({
+    enabled: false,
+    backgroundColor: "#8A3D5A",
+    textColor: "#FFFFFF",
+    scrolling: true,
+    items: []
+  });
+  const [whyLelaList, setWhyLelaList] = useState([]);
+  const [howItWorksList, setHowItWorksList] = useState([]);
+
+  const [editingAnnItem, setEditingAnnItem] = useState(null);
+  const [showAnnModal, setShowAnnModal] = useState(false);
+  const [annItemForm, setAnnItemForm] = useState({ textEn: "", textAr: "", startDate: "", endDate: "" });
+
+  const [editingWhyCard, setEditingWhyCard] = useState(null);
+  const [showWhyCardModal, setShowWhyCardModal] = useState(false);
+  const [whyCardForm, setWhyCardForm] = useState({ id: "", icon: "Sparkles", titleEn: "", titleAr: "", descEn: "", descAr: "", order: 1 });
+
+  const [editingHowStep, setEditingHowStep] = useState(null);
+  const [showHowStepModal, setShowHowStepModal] = useState(false);
+  const [howStepForm, setHowStepForm] = useState({ step: 1, titleEn: "", titleAr: "", descEn: "", descAr: "" });
+
   const [editingCoupon, setEditingCoupon] = useState(null);
   const [showCouponModal, setShowCouponModal] = useState(false);
   const [couponForm, setCouponForm] = useState({
@@ -350,6 +374,20 @@ export const Admin = () => {
         email: allSettings?.contactInfo?.email || "",
         instagram: allSettings?.contactInfo?.instagram || "",
         facebook: allSettings?.contactInfo?.facebook || ""
+      });
+
+      // Load homepage content sections
+      setWhyLelaList(allSettings?.homepage?.whyLela || []);
+      setHowItWorksList(allSettings?.homepage?.howItWorks || []);
+
+      // Load announcement settings
+      const annConfig = await settingsService.getAnnouncements();
+      setAnnouncementConfig(annConfig || {
+        enabled: false,
+        backgroundColor: "#8A3D5A",
+        textColor: "#FFFFFF",
+        scrolling: true,
+        items: []
       });
     } catch (e) {
       console.error(e);
@@ -846,6 +884,83 @@ export const Admin = () => {
     reader.readAsText(file);
   };
 
+
+  // HOMEPAGE SECTIONS & ANNOUNCEMENT BAR HANDLERS
+  const handleSaveAnnConfig = async () => {
+    try {
+      await settingsService.saveAnnouncements(announcementConfig);
+      toast.success("Announcement configuration saved successfully!");
+      loadData();
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to save announcements");
+    }
+  };
+
+  const handleSaveWhyLelaCard = async (cardData) => {
+    const updated = [...whyLelaList];
+    const idx = updated.findIndex(c => c.id === cardData.id);
+    if (idx >= 0) {
+      updated[idx] = cardData;
+    } else {
+      updated.push({ ...cardData, id: String(Date.now()) });
+    }
+    updated.sort((a, b) => parseInt(a.order || 99) - parseInt(b.order || 99));
+    setWhyLelaList(updated);
+    
+    try {
+      await settingsService.updateHomepage({ whyLela: updated });
+      toast.success("Why LELA cards updated!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to save Why LELA cards");
+    }
+  };
+
+  const handleDeleteWhyLelaCard = async (id) => {
+    const filtered = whyLelaList.filter(c => c.id !== id);
+    setWhyLelaList(filtered);
+    try {
+      await settingsService.updateHomepage({ whyLela: filtered });
+      toast.success("Card deleted successfully!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to delete card");
+    }
+  };
+
+  const handleSaveHowItWorksStep = async (stepData) => {
+    const updated = [...howItWorksList];
+    const idx = updated.findIndex(s => s.step === stepData.step);
+    if (idx >= 0) {
+      updated[idx] = stepData;
+    } else {
+      updated.push(stepData);
+    }
+    updated.sort((a, b) => a.step - b.step);
+    setHowItWorksList(updated);
+    
+    try {
+      await settingsService.updateHomepage({ howItWorks: updated });
+      toast.success("How It Works steps updated!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to save How It Works steps");
+    }
+  };
+
+  const handleDeleteHowItWorksStep = async (stepNum) => {
+    const filtered = howItWorksList.filter(s => s.step !== stepNum);
+    const reindexed = filtered.map((s, idx) => ({ ...s, step: idx + 1 }));
+    setHowItWorksList(reindexed);
+    try {
+      await settingsService.updateHomepage({ howItWorks: reindexed });
+      toast.success("Step deleted successfully!");
+    } catch (e) {
+      console.error(e);
+      toast.error("Failed to delete step");
+    }
+  };
 
   // BRANDING & HERO OPERATIONS
   const handleBrandingSubmit = async (e) => {
@@ -1733,6 +1848,7 @@ export const Admin = () => {
               orders={orders} 
               purchases={purchases} 
               expenses={expenses} 
+              representatives={representatives} 
               language={language} 
             />
           )}
@@ -2739,6 +2855,277 @@ export const Admin = () => {
                   Save Website Branding & Styles
                 </button>
               </form>
+
+              {/* Announcement Bar Section */}
+              <div className="pt-6 border-t border-primary/5 space-y-4">
+                <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text/80">
+                  Announcement Bar Configuration
+                </h3>
+                <div className="bg-brand-bg/10 dark:bg-brand-dark-bg/25 border border-primary/5 p-5 rounded-2xl space-y-4 text-xs">
+                  <div className="grid grid-cols-1 md:grid-cols-4 gap-4 items-center">
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="annEnabled"
+                        checked={announcementConfig.enabled}
+                        onChange={(e) => setAnnouncementConfig(prev => ({ ...prev, enabled: e.target.checked }))}
+                        className="w-4 h-4 text-primary border-primary/10 rounded focus:ring-primary/20"
+                      />
+                      <label htmlFor="annEnabled" className="font-semibold text-brand-text dark:text-brand-dark-text">Enable Bar</label>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="checkbox"
+                        id="annScroll"
+                        checked={announcementConfig.scrolling}
+                        onChange={(e) => setAnnouncementConfig(prev => ({ ...prev, scrolling: e.target.checked }))}
+                        className="w-4 h-4 text-primary border-primary/10 rounded focus:ring-primary/20"
+                      />
+                      <label htmlFor="annScroll" className="font-semibold text-brand-text dark:text-brand-dark-text">Scrolling Marquee</label>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-brand-text/60">Background Color</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={announcementConfig.backgroundColor}
+                          onChange={(e) => setAnnouncementConfig(prev => ({ ...prev, backgroundColor: e.target.value }))}
+                          className="w-6 h-6 border-0 rounded cursor-pointer p-0 bg-transparent"
+                        />
+                        <input
+                          type="text"
+                          value={announcementConfig.backgroundColor}
+                          onChange={(e) => setAnnouncementConfig(prev => ({ ...prev, backgroundColor: e.target.value }))}
+                          className="w-full px-2 py-1 rounded border border-primary/10 bg-admin-bg text-[10px]"
+                        />
+                      </div>
+                    </div>
+
+                    <div className="space-y-1">
+                      <label className="text-[10px] font-bold text-brand-text/60">Text Color</label>
+                      <div className="flex gap-2 items-center">
+                        <input
+                          type="color"
+                          value={announcementConfig.textColor}
+                          onChange={(e) => setAnnouncementConfig(prev => ({ ...prev, textColor: e.target.value }))}
+                          className="w-6 h-6 border-0 rounded cursor-pointer p-0 bg-transparent"
+                        />
+                        <input
+                          type="text"
+                          value={announcementConfig.textColor}
+                          onChange={(e) => setAnnouncementConfig(prev => ({ ...prev, textColor: e.target.value }))}
+                          className="w-full px-2 py-1 rounded border border-primary/10 bg-admin-bg text-[10px]"
+                        />
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 pt-2">
+                    <div className="flex justify-between items-center">
+                      <h4 className="font-bold text-[11px] uppercase tracking-wider text-brand-text/60">Notice Items</h4>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setEditingAnnItem(null);
+                          setAnnItemForm({ textEn: "", textAr: "", startDate: "", endDate: "" });
+                          setShowAnnModal(true);
+                        }}
+                        className="px-3 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[10px] font-semibold"
+                      >
+                        + Add Announcement
+                      </button>
+                    </div>
+
+                    <div className="space-y-2">
+                      {announcementConfig.items && announcementConfig.items.map((ann, idx) => (
+                        <div key={ann.id || idx} className="p-3 bg-white dark:bg-brand-dark-card border border-primary/5 rounded-xl flex justify-between items-center gap-4 text-xs shadow-sm">
+                          <div>
+                            <div className="font-semibold text-brand-text dark:text-brand-dark-text">{ann.text.ar} | {ann.text.en}</div>
+                            {(ann.startDate || ann.endDate) && (
+                              <div className="text-[9px] text-brand-text/45 mt-1 font-english">
+                                Schedule: {ann.startDate || "Anytime"} to {ann.endDate || "Anytime"}
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex gap-2">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setEditingAnnItem(idx);
+                                setAnnItemForm({
+                                  textEn: ann.text.en,
+                                  textAr: ann.text.ar,
+                                  startDate: ann.startDate || "",
+                                  endDate: ann.endDate || ""
+                                });
+                                setShowAnnModal(true);
+                              }}
+                              className="px-2.5 py-1 text-primary hover:bg-primary/5 rounded text-[10px] font-bold"
+                            >
+                              Edit
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                const list = announcementConfig.items.filter((_, i) => i !== idx);
+                                setAnnouncementConfig(prev => ({ ...prev, items: list }));
+                              }}
+                              className="px-2.5 py-1 text-red-500 hover:bg-red-500/5 rounded text-[10px] font-bold"
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+
+                  <button
+                    type="button"
+                    onClick={handleSaveAnnConfig}
+                    className="px-5 py-2 rounded-xl bg-primary text-white text-[10px] font-bold uppercase tracking-wider transition-all cursor-pointer"
+                  >
+                    Save Announcement Bar Settings
+                  </button>
+                </div>
+              </div>
+
+              {/* Why LELA Editor Section */}
+              <div className="pt-6 border-t border-primary/5 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text/80">
+                    Edit "Why LELA" Cards Section
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingWhyCard(null);
+                      setWhyCardForm({ id: "", icon: "Sparkles", titleEn: "", titleAr: "", descEn: "", descAr: "", order: whyLelaList.length + 1 });
+                      setShowWhyCardModal(true);
+                    }}
+                    className="px-3 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[10px] font-semibold cursor-pointer"
+                  >
+                    + Add New Card
+                  </button>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                  {whyLelaList.map((card) => (
+                    <div key={card.id} className="p-4 bg-white dark:bg-brand-dark-card border border-primary/5 rounded-2xl flex items-start gap-3 shadow-sm relative group">
+                      <div className="p-2.5 bg-primary/5 rounded-xl text-primary mt-1">
+                        {card.icon === "Sparkles" && <Sparkles className="w-5 h-5" />}
+                        {card.icon === "ShieldCheck" && <ShieldCheck className="w-5 h-5" />}
+                        {card.icon === "Coins" && <Coins className="w-5 h-5" />}
+                        {card.icon === "Truck" && <Truck className="w-5 h-5" />}
+                      </div>
+                      <div className="flex-1 space-y-1 text-xs">
+                        <div className="flex justify-between items-center">
+                          <h4 className="font-bold text-brand-text dark:text-brand-dark-text">{card.title.ar} | {card.title.en}</h4>
+                          <span className="text-[9px] font-bold px-1.5 py-0.5 rounded bg-primary/5 font-english">Order: {card.order || 1}</span>
+                        </div>
+                        <p className="text-[10px] text-brand-text/50 dark:text-brand-dark-text/50 font-light leading-relaxed">
+                          {card.description.ar}
+                        </p>
+                        <p className="text-[10px] text-brand-text/50 dark:text-brand-dark-text/50 font-light leading-relaxed">
+                          {card.description.en}
+                        </p>
+                        <div className="flex gap-2 pt-2 justify-end">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              setEditingWhyCard(card);
+                              setWhyCardForm({
+                                id: card.id,
+                                icon: card.icon || "Sparkles",
+                                titleEn: card.title.en,
+                                titleAr: card.title.ar,
+                                descEn: card.description.en,
+                                descAr: card.description.ar,
+                                order: card.order || 1
+                              });
+                              setShowWhyCardModal(true);
+                            }}
+                            className="px-2.5 py-1 text-primary hover:bg-primary/5 rounded text-[10px] font-bold cursor-pointer"
+                          >
+                            Edit
+                          </button>
+                          <button
+                            type="button"
+                            onClick={() => handleDeleteWhyLelaCard(card.id)}
+                            className="px-2.5 py-1 text-red-500 hover:bg-red-500/5 rounded text-[10px] font-bold cursor-pointer"
+                          >
+                            Delete
+                          </button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* How It Works Editor Section */}
+              <div className="pt-6 border-t border-primary/5 space-y-4">
+                <div className="flex justify-between items-center">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text/80">
+                    Edit "How It Works" Steps
+                  </h3>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setEditingHowStep(null);
+                      setHowStepForm({ step: howItWorksList.length + 1, titleEn: "", titleAr: "", descEn: "", descAr: "" });
+                      setShowHowStepModal(true);
+                    }}
+                    className="px-3 py-1 bg-primary/10 hover:bg-primary/20 text-primary rounded-lg text-[10px] font-semibold cursor-pointer"
+                  >
+                    + Add New Step
+                  </button>
+                </div>
+
+                <div className="space-y-3">
+                  {howItWorksList.map((item) => (
+                    <div key={item.step} className="p-4 bg-white dark:bg-brand-dark-card border border-primary/5 rounded-2xl flex items-center justify-between gap-4 shadow-sm text-xs">
+                      <div className="flex items-center gap-3">
+                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center font-bold text-primary font-english text-xs">
+                          0{item.step}
+                        </div>
+                        <div>
+                          <h4 className="font-bold text-brand-text dark:text-brand-dark-text">{item.title.ar} | {item.title.en}</h4>
+                          <p className="text-[10px] text-brand-text/50 mt-0.5 line-clamp-1">{item.description.ar} / {item.description.en}</p>
+                        </div>
+                      </div>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setEditingHowStep(item);
+                            setHowStepForm({
+                              step: item.step,
+                              titleEn: item.title.en,
+                              titleAr: item.title.ar,
+                              descEn: item.description.en,
+                              descAr: item.description.ar
+                            });
+                            setShowHowStepModal(true);
+                          }}
+                          className="px-2.5 py-1 text-primary hover:bg-primary/5 rounded text-[10px] font-bold cursor-pointer"
+                        >
+                          Edit
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => handleDeleteHowItWorksStep(item.step)}
+                          className="px-2.5 py-1 text-red-500 hover:bg-red-500/5 rounded text-[10px] font-bold cursor-pointer"
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
 
               {/* Maintenance options */}
               <div className="pt-6 border-t border-primary/5 space-y-4">
@@ -3756,6 +4143,287 @@ export const Admin = () => {
                 >
                   <CheckCircle className="w-3.5 h-3.5" />
                   Save Coupon
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Announcement Item modal */}
+      {showAnnModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-brand-dark-card border border-primary/10 rounded-2xl w-full max-w-sm p-5 space-y-4 shadow-xl">
+            <h3 className="text-xs font-bold uppercase text-brand-text dark:text-brand-dark-text">
+              {editingAnnItem !== null ? "Edit Announcement Notice" : "Add Announcement Notice"}
+            </h3>
+            <div className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Notice Text (Arabic)</label>
+                <input
+                  type="text"
+                  value={annItemForm.textAr}
+                  onChange={(e) => setAnnItemForm(prev => ({ ...prev, textAr: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Notice Text (English)</label>
+                <input
+                  type="text"
+                  value={annItemForm.textEn}
+                  onChange={(e) => setAnnItemForm(prev => ({ ...prev, textEn: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs"
+                />
+              </div>
+              <div className="grid grid-cols-2 gap-3">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-brand-text/50">Start Date</label>
+                  <input
+                    type="date"
+                    value={annItemForm.startDate}
+                    onChange={(e) => setAnnItemForm(prev => ({ ...prev, startDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs font-english"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-brand-text/50">End Date</label>
+                  <input
+                    type="date"
+                    value={annItemForm.endDate}
+                    onChange={(e) => setAnnItemForm(prev => ({ ...prev, endDate: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs font-english"
+                  />
+                </div>
+              </div>
+            </div>
+            <div className="flex gap-2 justify-end">
+              <button
+                type="button"
+                onClick={() => setShowAnnModal(false)}
+                className="px-3 py-1.5 border border-primary/10 rounded-lg text-[10px] font-bold cursor-pointer"
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  const item = {
+                    id: editingAnnItem !== null && announcementConfig.items[editingAnnItem]?.id ? announcementConfig.items[editingAnnItem].id : String(Date.now()),
+                    text: { en: annItemForm.textEn, ar: annItemForm.textAr },
+                    startDate: annItemForm.startDate,
+                    endDate: annItemForm.endDate
+                  };
+                  const updatedItems = [...(announcementConfig.items || [])];
+                  if (editingAnnItem !== null) {
+                    updatedItems[editingAnnItem] = item;
+                  } else {
+                    updatedItems.push(item);
+                  }
+                  setAnnouncementConfig(prev => ({ ...prev, items: updatedItems }));
+                  setShowAnnModal(false);
+                }}
+                className="px-4 py-1.5 bg-primary text-white rounded-lg text-[10px] font-bold cursor-pointer"
+              >
+                Apply
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Why LELA Card Modal */}
+      {showWhyCardModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-brand-dark-card border border-primary/10 rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl">
+            <h3 className="text-xs font-bold uppercase text-brand-text dark:text-brand-dark-text">
+              {editingWhyCard ? "Edit Why LELA Card" : "Add Why LELA Card"}
+            </h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              await handleSaveWhyLelaCard({
+                id: whyCardForm.id,
+                icon: whyCardForm.icon,
+                title: { en: whyCardForm.titleEn, ar: whyCardForm.titleAr },
+                description: { en: whyCardForm.descEn, ar: whyCardForm.descAr },
+                order: parseInt(whyCardForm.order || 1, 10)
+              });
+              setShowWhyCardModal(false);
+            }} className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Icon</label>
+                <select
+                  value={whyCardForm.icon}
+                  onChange={(e) => setWhyCardForm(prev => ({ ...prev, icon: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs focus:outline-none"
+                >
+                  <option value="Sparkles">Sparkles</option>
+                  <option value="ShieldCheck">ShieldCheck</option>
+                  <option value="Coins">Coins</option>
+                  <option value="Truck">Truck</option>
+                </select>
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-brand-text/50">Title (Arabic)</label>
+                  <input
+                    type="text"
+                    required
+                    value={whyCardForm.titleAr}
+                    onChange={(e) => setWhyCardForm(prev => ({ ...prev, titleAr: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-brand-text/50">Title (English)</label>
+                  <input
+                    type="text"
+                    required
+                    value={whyCardForm.titleEn}
+                    onChange={(e) => setWhyCardForm(prev => ({ ...prev, titleEn: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Description (Arabic)</label>
+                <textarea
+                  required
+                  rows="2"
+                  value={whyCardForm.descAr}
+                  onChange={(e) => setWhyCardForm(prev => ({ ...prev, descAr: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Description (English)</label>
+                <textarea
+                  required
+                  rows="2"
+                  value={whyCardForm.descEn}
+                  onChange={(e) => setWhyCardForm(prev => ({ ...prev, descEn: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Display Order</label>
+                <input
+                  type="number"
+                  value={whyCardForm.order}
+                  onChange={(e) => setWhyCardForm(prev => ({ ...prev, order: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs font-english"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowWhyCardModal(false)}
+                  className="px-3 py-1.5 border border-primary/10 rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-primary text-white rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  Save Card
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* How It Works Step Modal */}
+      {showHowStepModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-brand-dark-card border border-primary/10 rounded-2xl w-full max-w-sm p-6 space-y-4 shadow-xl">
+            <h3 className="text-xs font-bold uppercase text-brand-text dark:text-brand-dark-text">
+              {editingHowStep ? "Edit How It Works Step" : "Add How It Works Step"}
+            </h3>
+            <form onSubmit={async (e) => {
+              e.preventDefault();
+              await handleSaveHowItWorksStep({
+                step: parseInt(howStepForm.step || 1, 10),
+                title: { en: howStepForm.titleEn, ar: howStepForm.titleAr },
+                description: { en: howStepForm.descEn, ar: howStepForm.descAr }
+              });
+              setShowHowStepModal(false);
+            }} className="space-y-3 text-xs">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Step Number</label>
+                <input
+                  type="number"
+                  required
+                  value={howStepForm.step}
+                  onChange={(e) => setHowStepForm(prev => ({ ...prev, step: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs font-english"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-brand-text/50">Title (Arabic)</label>
+                  <input
+                    type="text"
+                    required
+                    value={howStepForm.titleAr}
+                    onChange={(e) => setHowStepForm(prev => ({ ...prev, titleAr: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs"
+                  />
+                </div>
+                <div className="space-y-1">
+                  <label className="text-[10px] font-bold text-brand-text/50">Title (English)</label>
+                  <input
+                    type="text"
+                    required
+                    value={howStepForm.titleEn}
+                    onChange={(e) => setHowStepForm(prev => ({ ...prev, titleEn: e.target.value }))}
+                    className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs"
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Description (Arabic)</label>
+                <textarea
+                  required
+                  rows="2"
+                  value={howStepForm.descAr}
+                  onChange={(e) => setHowStepForm(prev => ({ ...prev, descAr: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs resize-none"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold text-brand-text/50">Description (English)</label>
+                <textarea
+                  required
+                  rows="2"
+                  value={howStepForm.descEn}
+                  onChange={(e) => setHowStepForm(prev => ({ ...prev, descEn: e.target.value }))}
+                  className="w-full px-3 py-2 rounded-xl border border-primary/10 bg-admin-bg text-xs resize-none"
+                />
+              </div>
+
+              <div className="flex gap-2 justify-end pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowHowStepModal(false)}
+                  className="px-3 py-1.5 border border-primary/10 rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  Cancel
+                </button>
+                <button
+                  type="submit"
+                  className="px-4 py-1.5 bg-primary text-white rounded-lg text-[10px] font-bold cursor-pointer"
+                >
+                  Save Step
                 </button>
               </div>
             </form>

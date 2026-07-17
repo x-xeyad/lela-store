@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useMemo } from "react";
 import { Link, useLocation } from "react-router-dom";
 import { useLanguage } from "../context/LanguageContext";
 import { useCart } from "../context/CartContext";
@@ -27,19 +27,41 @@ export const Navbar = () => {
   
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isFavoritesOpen, setIsFavoritesOpen] = useState(false);
-  const [announcements, setAnnouncements] = useState([]);
+  const [announcementConfig, setAnnouncementConfig] = useState({
+    enabled: false,
+    backgroundColor: "#8A3D5A",
+    textColor: "#FFFFFF",
+    scrolling: true,
+    items: []
+  });
 
   useEffect(() => {
     const fetchAnnouncements = async () => {
       try {
-        const list = await settingsService.getAnnouncements();
-        setAnnouncements(list || []);
+        const config = await settingsService.getAnnouncements();
+        setAnnouncementConfig(config || {
+          enabled: false,
+          backgroundColor: "#8A3D5A",
+          textColor: "#FFFFFF",
+          scrolling: true,
+          items: []
+        });
       } catch (e) {
         console.error("Failed to load announcements in navbar", e);
       }
     };
     fetchAnnouncements();
   }, []);
+
+  const activeAnnouncements = useMemo(() => {
+    if (!announcementConfig.enabled || !announcementConfig.items) return [];
+    const now = new Date();
+    return announcementConfig.items.filter(item => {
+      if (item.startDate && new Date(item.startDate) > now) return false;
+      if (item.endDate && new Date(item.endDate) < now) return false;
+      return true;
+    }).map(item => item.text[language] || item.text.en);
+  }, [announcementConfig, language]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -80,20 +102,35 @@ export const Navbar = () => {
             : "bg-transparent"
         }`}
       >
-        {announcements.length > 0 && (
-          <div className="bg-primary text-white text-[10px] py-1.5 px-4 font-semibold tracking-wider flex justify-center items-center text-center marquee-container relative z-50 select-none">
-            <div className="marquee-content inline-flex items-center gap-16">
-              {announcements.map((ann, idx) => (
-                <span key={idx} className="inline-flex items-center gap-2">
-                  {ann}
-                </span>
-              ))}
-              {announcements.map((ann, idx) => (
-                <span key={`dup-${idx}`} className="inline-flex items-center gap-2">
-                  {ann}
-                </span>
-              ))}
-            </div>
+        {activeAnnouncements.length > 0 && (
+          <div 
+            style={{ backgroundColor: announcementConfig.backgroundColor, color: announcementConfig.textColor }}
+            className="text-[10px] py-1.5 px-4 font-semibold tracking-wider flex justify-center items-center text-center relative z-50 select-none overflow-hidden w-full"
+          >
+            {announcementConfig.scrolling ? (
+              <div className="marquee-container w-full">
+                <div className="marquee-content inline-flex items-center gap-16">
+                  {activeAnnouncements.map((ann, idx) => (
+                    <span key={idx} className="inline-flex items-center gap-2">
+                      {ann}
+                    </span>
+                  ))}
+                  {activeAnnouncements.map((ann, idx) => (
+                    <span key={`dup-${idx}`} className="inline-flex items-center gap-2">
+                      {ann}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            ) : (
+              <div className="flex flex-wrap justify-center items-center gap-6">
+                {activeAnnouncements.map((ann, idx) => (
+                  <span key={idx} className="inline-flex items-center gap-2">
+                    {ann}
+                  </span>
+                ))}
+              </div>
+            )}
           </div>
         )}
         <div className={`max-w-7xl mx-auto px-6 md:px-12 flex items-center justify-between transition-all duration-550 ${isScrolled ? 'py-3' : 'py-5'}`}>
@@ -146,24 +183,7 @@ export const Navbar = () => {
               );
             })}
             
-            {/* Admin status link */}
-            {isAuthenticated ? (
-              <Link
-                to="/admin"
-                className="text-xs font-bold text-amber-500 hover:text-amber-600 uppercase tracking-widest font-english flex items-center gap-1.5"
-              >
-                <ShieldAlert className="w-3.5 h-3.5" />
-                {t("admin")}
-              </Link>
-            ) : (
-              <Link
-                to="/admin"
-                className="text-xs font-bold text-brand-text/75 dark:text-brand-dark-text/75 hover:text-primary dark:hover:text-secondary uppercase tracking-widest font-english flex items-center gap-1.5"
-              >
-                <Lock className="w-3.5 h-3.5 text-primary/70 dark:text-secondary/70" />
-                {t("adminLogin")}
-              </Link>
-            )}
+
           </nav>
 
           {/* Header Controls (Language, Theme, Currency, Cart, Wishlist, Hamburger) */}
@@ -241,23 +261,7 @@ export const Navbar = () => {
                 {link.name}
               </Link>
             ))}
-            {isAuthenticated ? (
-              <Link
-                to="/admin"
-                className="text-sm font-bold text-amber-500 hover:text-amber-600 uppercase tracking-widest font-english py-2 flex items-center justify-center gap-1.5 block w-full"
-              >
-                <ShieldAlert className="w-4 h-4" />
-                {t("admin")}
-              </Link>
-            ) : (
-              <Link
-                to="/admin"
-                className="text-sm font-bold text-brand-text dark:text-brand-dark-text hover:text-primary dark:hover:text-secondary uppercase tracking-widest font-english py-2 flex items-center justify-center gap-1.5 block w-full"
-              >
-                <Lock className="w-4 h-4 text-primary dark:text-secondary" />
-                {t("adminLogin")}
-              </Link>
-            )}
+
 
             <div className="flex items-center gap-6 pt-4 border-t border-primary/5 dark:border-secondary/5 w-full justify-center">
               <LanguageSwitcher />

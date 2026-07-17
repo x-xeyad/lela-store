@@ -19,6 +19,7 @@ import {
   ShieldCheck
 } from "lucide-react";
 import toast from "react-hot-toast";
+import { supabase } from "../services/supabaseClient";
 
 export const ProductDetail = () => {
   const { id } = useParams();
@@ -40,6 +41,25 @@ export const ProductDetail = () => {
   const [selectedVariants, setSelectedVariants] = useState({});
   const [quantity, setQuantity] = useState(1);
   const [relatedProducts, setRelatedProducts] = useState([]);
+
+  // Quick WhatsApp Buy States
+  const [showWhatsappModal, setShowWhatsappModal] = useState(false);
+  const [waCustomerName, setWaCustomerName] = useState("");
+  const [waCustomerPhone, setWaCustomerPhone] = useState("");
+  const [waCustomerGov, setWaCustomerGov] = useState("Sanaa");
+  const [waCustomerNotes, setWaCustomerNotes] = useState("");
+  const [waSubmitting, setWaSubmitting] = useState(false);
+
+  const governorates = [
+    { value: "Sanaa", nameEn: "Sana'a", nameAr: "صنعاء" },
+    { value: "Aden", nameEn: "Aden", nameAr: "عدن" },
+    { value: "Taiz", nameEn: "Taiz", nameAr: "تعز" },
+    { value: "Ibb", nameEn: "Ibb", nameAr: "إب" },
+    { value: "Hadhramaut", nameEn: "Hadhramaut", nameAr: "حضرموت" },
+    { value: "Al Hudaydah", nameEn: "Al Hudaydah", nameAr: "الحديدة" },
+    { value: "Dhamar", nameEn: "Dhamar", nameAr: "ذمار" },
+    { value: "Marib", nameEn: "Marib", nameAr: "مأرب" }
+  ];
 
   useEffect(() => {
     const loadProduct = async () => {
@@ -132,29 +152,104 @@ export const ProductDetail = () => {
   };
 
   const handleBuyNowWhatsapp = () => {
-    let variantsStr = "";
-    Object.entries(selectedVariants).forEach(([key, val]) => {
-      variantsStr += `\n- ${key}: ${val}`;
-    });
-    
-    const formattedItem = formatPrice(currentPriceEGP, "en");
-    const formattedShip = formatPrice(shipCostEGP, "en");
-    const formattedTotal = formatPrice(totalPriceEGP * quantity, "en");
-    
-    let text = `*LELA QUICK BUY REQUEST*\n`;
-    text += `--------------------------\n`;
-    text += `*Product:* ${product.name.en}\n`;
-    text += `*Qty:* ${quantity}${variantsStr}\n`;
-    text += `*Weight:* ${weight} KG\n\n`;
-    text += `*Item Price:* ${formattedItem}\n`;
-    text += `*Shipping Cost:* ${formattedShip}\n`;
-    text += `*Total Amount:* ${formattedTotal}\n`;
-    text += `--------------------------\n`;
-    text += `Please process my order. Thank you!`;
+    setShowWhatsappModal(true);
+  };
 
-    const encodedMsg = encodeURIComponent(text);
-    const whatsappUrl = `https://wa.me/${CONTACT_INFO.phoneYemen.replace("+", "")}?text=${encodedMsg}`;
-    window.open(whatsappUrl, "_blank");
+  const handleConfirmWhatsappOrder = async (e) => {
+    e.preventDefault();
+    if (!waCustomerName.trim() || !waCustomerPhone.trim()) {
+      toast.error(language === "ar" ? "يرجى ملء الحقول المطلوبة" : "Please fill out all required fields");
+      return;
+    }
+    
+    setWaSubmitting(true);
+    try {
+      const orderNum = `WA-ORD-${Math.floor(100000 + Math.random() * 900000)}`;
+      const exchangeRate = 11.5;
+      const totalEgp = totalPriceEGP * quantity;
+      const totalYer = totalEgp * exchangeRate;
+
+      let variantsStr = "";
+      Object.entries(selectedVariants).forEach(([key, val]) => {
+        variantsStr += `\n- ${key}: ${val}`;
+      });
+
+      const itemsArray = [{
+        product: {
+          id: product.id,
+          name: product.name,
+          priceEGP: currentPriceEGP
+        },
+        quantity: quantity,
+        price: currentPriceEGP,
+        selectedVariants: selectedVariants
+      }];
+
+      // Save order to database
+      const { error: dbError } = await supabase.from("orders").insert([{
+        id: orderNum,
+        customer: {
+          name: waCustomerName.trim(),
+          phone: waCustomerPhone.trim(),
+          governorate: waCustomerGov,
+          address: waCustomerNotes.trim() || "Sanaa"
+        },
+        items: itemsArray,
+        total_egp: totalEgp,
+        total_yer: totalYer,
+        selected_currency: "YER",
+        exchange_rate: exchangeRate,
+        status: "Pending WhatsApp Confirmation",
+        discount_amount: 0,
+        created_at: new Date().toISOString()
+      }]);
+
+      if (dbError) throw dbError;
+
+      // Format WhatsApp Message
+      const formattedTotal = formatPrice(totalEgp, "en");
+      const formattedShip = formatPrice(shipCostEGP, "en");
+      
+      let text = `*LELA STORE QUICK BUY REQUEST*\n`;
+      text += `--------------------------\n`;
+      text += `*Order Number:* ${orderNum}\n`;
+      text += `*Customer:* ${waCustomerName.trim()}\n`;
+      text += `*Phone:* ${waCustomerPhone.trim()}\n`;
+      text += `*Governorate:* ${waCustomerGov}\n\n`;
+      text += `*Product:* ${product.name.en || product.name.ar}\n`;
+      text += `*Qty:* ${quantity}${variantsStr}\n`;
+      text += `*Weight:* ${weight} KG\n\n`;
+      text += `*Shipping Cost:* ${formattedShip}\n`;
+      text += `*Total Amount:* ${formattedTotal}\n`;
+      if (waCustomerNotes.trim()) {
+        text += `*Notes:* ${waCustomerNotes.trim()}\n`;
+      }
+      text += `--------------------------\n`;
+      text += `Your Order Number is *${orderNum}*.\n`;
+      text += `You can track your order later from the website using this number.`;
+
+      const encodedMsg = encodeURIComponent(text);
+      const whatsappUrl = `https://wa.me/${CONTACT_INFO.phoneYemen.replace("+", "")}?text=${encodedMsg}`;
+      
+      toast.success(language === "ar" ? "تم تسجيل الطلب! جاري التحويل للواتساب..." : "Order registered! Redirecting to WhatsApp...");
+      
+      // Close modal and reset fields
+      setShowWhatsappModal(false);
+      setWaCustomerName("");
+      setWaCustomerPhone("");
+      setWaCustomerNotes("");
+      
+      // Open WhatsApp
+      setTimeout(() => {
+        window.open(whatsappUrl, "_blank");
+      }, 1000);
+      
+    } catch (err) {
+      console.error("Error creating WhatsApp order:", err);
+      toast.error(language === "ar" ? "فشل تسجيل الطلب" : "Failed to record order in database");
+    } finally {
+      setWaSubmitting(false);
+    }
   };
 
   const handleVariantChange = (name, value) => {
@@ -456,6 +551,108 @@ export const ProductDetail = () => {
             ))}
           </div>
         </section>
+      )}
+
+      {/* Quick WhatsApp Checkout Modal */}
+      {showWhatsappModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-brand-dark-card border border-primary/10 dark:border-secondary/10 rounded-3xl w-full max-w-md p-6 space-y-6 shadow-2xl relative">
+            <div className="text-center space-y-2">
+              <h3 className="text-lg font-bold text-brand-text dark:text-brand-dark-text font-english uppercase tracking-wider">
+                {language === "ar" ? "إكمال الطلب عبر واتساب" : "WhatsApp Quick Buy"}
+              </h3>
+              <p className="text-[10px] text-brand-text/45 dark:text-brand-dark-text/45 font-light">
+                {language === "ar" 
+                  ? "يرجى إدخال بياناتكِ لحفظ الطلب في قاعدة البيانات وتتبع حالة الشحنة لاحقاً" 
+                  : "Enter your contact details to generate your tracking code before redirecting to WhatsApp"}
+              </p>
+            </div>
+            
+            <form onSubmit={handleConfirmWhatsappOrder} className="space-y-4">
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-brand-text/50 dark:text-brand-dark-text/50">
+                  {language === "ar" ? "الاسم الكامل" : "Full Name"} *
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={waCustomerName}
+                  onChange={(e) => setWaCustomerName(e.target.value)}
+                  placeholder={language === "ar" ? "علياء أحمد" : "e.g. Huda Al-Yemeni"}
+                  className="w-full px-4 py-2.5 rounded-xl border border-primary/10 dark:border-secondary/10 bg-brand-bg/10 dark:bg-brand-dark-bg text-xs text-brand-text dark:text-brand-dark-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-brand-text/50 dark:text-brand-dark-text/50">
+                  {language === "ar" ? "رقم الهاتف (واتساب)" : "WhatsApp Phone Number"} *
+                </label>
+                <input
+                  type="tel"
+                  required
+                  value={waCustomerPhone}
+                  onChange={(e) => setWaCustomerPhone(e.target.value)}
+                  placeholder="96777XXXXXXX"
+                  className="w-full px-4 py-2.5 rounded-xl border border-primary/10 dark:border-secondary/10 bg-brand-bg/10 dark:bg-brand-dark-bg text-xs text-brand-text dark:text-brand-dark-text focus:outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 transition-all font-english font-semibold"
+                />
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-brand-text/50 dark:text-brand-dark-text/50">
+                  {language === "ar" ? "المحافظة" : "Governorate"} *
+                </label>
+                <select
+                  value={waCustomerGov}
+                  onChange={(e) => setWaCustomerGov(e.target.value)}
+                  className="w-full px-4 py-2.5 rounded-xl border border-primary/10 dark:border-secondary/10 bg-brand-bg/10 dark:bg-brand-dark-bg text-xs text-brand-text dark:text-brand-dark-text focus:outline-none focus:border-primary transition-all font-semibold"
+                >
+                  {governorates.map(g => (
+                    <option key={g.value} value={g.value}>
+                      {language === "ar" ? g.nameAr : g.nameEn}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-[10px] font-bold uppercase text-brand-text/50 dark:text-brand-dark-text/50">
+                  {language === "ar" ? "ملاحظات إضافية (اختياري)" : "Shipping Address / Notes (Optional)"}
+                </label>
+                <textarea
+                  value={waCustomerNotes}
+                  onChange={(e) => setWaCustomerNotes(e.target.value)}
+                  placeholder={language === "ar" ? "مثال: تسليم عند مكتب شحن معين..." : "e.g. Delivery instructions..."}
+                  rows="2"
+                  className="w-full px-4 py-2.5 rounded-xl border border-primary/10 dark:border-secondary/10 bg-brand-bg/10 dark:bg-brand-dark-bg text-xs text-brand-text dark:text-brand-dark-text focus:outline-none focus:border-primary transition-all font-light"
+                />
+              </div>
+
+              <div className="flex gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => setShowWhatsappModal(false)}
+                  className="flex-1 py-3 border border-primary/10 dark:border-secondary/10 hover:bg-primary/5 rounded-xl text-xs font-semibold text-brand-text/70 dark:text-brand-dark-text/70 uppercase tracking-wider font-english transition-all cursor-pointer"
+                >
+                  {language === "ar" ? "إلغاء" : "Cancel"}
+                </button>
+                <button
+                  type="submit"
+                  disabled={waSubmitting}
+                  className="flex-1 py-3 bg-green-500 hover:bg-green-600 text-white rounded-xl text-xs font-semibold uppercase tracking-wider font-english transition-all flex items-center justify-center gap-1.5 cursor-pointer disabled:opacity-50"
+                >
+                  {waSubmitting ? (
+                    <div className="w-4 h-4 rounded-full border-2 border-white border-t-transparent animate-spin" />
+                  ) : (
+                    <>
+                      <MessageCircle className="w-4 h-4" />
+                      {language === "ar" ? "تأكيد وإرسال" : "Confirm & Send"}
+                    </>
+                  )}
+                </button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );

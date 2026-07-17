@@ -12,8 +12,49 @@ const defaultHomepage = {
       ar: "ليلا هي رفيقة تسوقك الشخصية الفاخرة. نوفر لكِ مستحضرات التجميل، الأزياء، والمنتجات المنزلية من القاهرة ونوصلها مباشرة إلى باب بيتكِ في اليمن."
     }
   },
-  whyLela: [],
-  howItWorks: []
+  whyLela: [
+    {
+      id: "1",
+      icon: "Sparkles",
+      title: { en: "100% Original Products", ar: "منتجات أصلية 100%" },
+      description: { en: "We source directly from Cairo's flagship stores and official pharmacies (e.g. Sephora, L'Oreal).", ar: "نوفرها لكِ مباشرة من المتاجر الرسمية والصيدليات المعتمدة في القاهرة." }
+    },
+    {
+      id: "2",
+      icon: "ShieldCheck",
+      title: { en: "Secure Personal Shopping", ar: "تسوق شخصي آمن" },
+      description: { en: "LELA acts as your local agent, handling inspection, purchasing, and secure packaging.", ar: "تعمل ليلا كوكيلكِ المحلي، وتتولى عمليات الفحص والشراء والتعبئة الآمنة." }
+    },
+    {
+      id: "3",
+      icon: "Truck",
+      title: { en: "Doorstep Delivery", ar: "توصيل إلى باب البيت" },
+      description: { en: "Direct cargo transit from Cairo to Sana'a, Aden, and all major governorates in Yemen.", ar: "شحن مباشر وآمن من القاهرة إلى صنعاء وعدن وجميع المحافظات اليمنية." }
+    },
+    {
+      id: "4",
+      icon: "Coins",
+      title: { en: "Flexible Payments", ar: "طرق دفع مرنة" },
+      description: { en: "Pay securely in YER, EGP, or SAR with multiple transfer methods.", ar: "ادفعي بأمان بالريال اليمني، الجنيه المصري، أو الريال السعودي عبر وسائل تحويل متعددة." }
+    }
+  ],
+  howItWorks: [
+    {
+      step: 1,
+      title: { en: "Browse or Request", ar: "تصفحي أو اطلبي" },
+      description: { en: "Explore our shop catalog or send custom links of products you want from Cairo.", ar: "تصفحي متجرنا أو أرسلي روابط وصور المنتجات التي ترغبين بها من القاهرة." }
+    },
+    {
+      step: 2,
+      title: { en: "Sourcing & Costing", ar: "توفير وتسعير" },
+      description: { en: "Our Cairo team inspects, calculates exact cost history, and shares order pricing.", ar: "يقوم فريقنا في القاهرة بفحص طلبكِ، وحساب التكلفة الدقيقة وعرض السعر النهائي." }
+    },
+    {
+      step: 3,
+      title: { en: "Fast Shipping to Yemen", ar: "شحن سريع لليمن" },
+      description: { en: "We pack your items securely and ship them to your doorstep in Yemen.", ar: "نقوم بتعبئة منتجاتكِ بشكل آمن وشحنها إلى باب بيتكِ في اليمن." }
+    }
+  ]
 };
 
 const defaultShippingRates = {
@@ -157,8 +198,14 @@ export const settingsService = {
   },
 
   updateHomepage: async (homepageData) => {
-    await saveGenericKey("homepage", homepageData);
-    return homepageData;
+    const current = await getGenericKey("homepage", defaultHomepage);
+    const merged = {
+      ...current,
+      ...homepageData,
+      hero: homepageData.hero ? { ...current.hero, ...homepageData.hero } : current.hero
+    };
+    await saveGenericKey("homepage", merged);
+    return merged;
   },
 
   updateShippingRates: async (rates) => {
@@ -536,7 +583,28 @@ export const settingsService = {
 
   // Announcements CRUD
   getAnnouncements: async () => {
-    return await getGenericKey("announcements", []);
+    const val = await getGenericKey("announcements", {
+      enabled: false,
+      backgroundColor: "#8A3D5A",
+      textColor: "#FFFFFF",
+      scrolling: true,
+      items: []
+    });
+    if (Array.isArray(val)) {
+      return {
+        enabled: val.length > 0,
+        backgroundColor: "#8A3D5A",
+        textColor: "#FFFFFF",
+        scrolling: true,
+        items: val.map((text, idx) => ({
+          id: String(idx),
+          text: { en: text, ar: text },
+          startDate: "",
+          endDate: ""
+        }))
+      };
+    }
+    return val;
   },
 
   saveAnnouncements: async (announcements) => {

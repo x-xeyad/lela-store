@@ -11,7 +11,7 @@ import {
   Clock 
 } from "lucide-react";
 
-export const ErpDashboard = ({ products, orders, purchases, expenses, language = "en" }) => {
+export const ErpDashboard = ({ products, orders, purchases, expenses, representatives = [], language = "en" }) => {
   // --- FINANCIAL CALCULATIONS ---
   const stats = useMemo(() => {
     const completedOrders = orders.filter(o => o.status === "completed");
@@ -19,14 +19,38 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
     // 1. Total Sales (EGP)
     const totalSales = completedOrders.reduce((acc, o) => acc + (o.totalEGP || 0), 0);
     
-    // 2. Cost of Goods Sold (COGS) - Purchase cost of items sold
+    // 2. Cost calculations
     let totalCogs = 0;
-    let totalSalesShipping = 0;
+    let totalSalesShippingEstimated = 0;
+    let totalSalesShippingActual = 0;
     let totalSalesPackaging = 0;
+    let totalDistributorProfit = 0;
+    let totalRepCommissions = 0;
+    let totalSalesDiscounts = 0;
     
     completedOrders.forEach(o => {
-      // Order shipping cost
-      totalSalesShipping += (o.shipping_cost_egp || 0);
+      // Estimated vs Actual shipping
+      const estShip = parseFloat(o.estimated_shipping_cost_egp || o.shipping_cost_egp || 0);
+      const actShip = parseFloat(o.actual_shipping_cost_egp || estShip);
+      totalSalesShippingEstimated += estShip;
+      totalSalesShippingActual += actShip;
+
+      // Discounts
+      totalSalesDiscounts += parseFloat(o.discount_amount || o.discountAmount || 0);
+
+      // Rep commissions
+      let orderRepCommission = 0;
+      if (o.representative_id) {
+        const rep = representatives.find(r => r.id === o.representative_id);
+        if (rep) {
+          if (rep.commission_type === 'percentage') {
+            orderRepCommission = (o.totalEGP || 0) * (parseFloat(rep.commission_value || 0) / 100);
+          } else {
+            orderRepCommission = parseFloat(rep.commission_value || 0);
+          }
+        }
+      }
+      totalRepCommissions += orderRepCommission;
       
       (o.items || []).forEach(item => {
         const prod = item.product || {};
@@ -34,41 +58,56 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
         
         const purchaseCost = parseFloat(prod.purchase_cost || prod.costEGP || 0);
         const packagingCost = parseFloat(prod.packaging_cost || 0);
+        const distProfit = parseFloat(prod.distributor_profit || 0);
         
         totalCogs += purchaseCost * qty;
         totalSalesPackaging += packagingCost * qty;
+        totalDistributorProfit += distProfit * qty;
       });
     });
 
     // 3. Total Expenses (EGP)
     const totalExpenses = expenses.reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0);
     
-    // 4. Gross Profit (EGP) = Sales - Purchase cost of sold items
+    // 4. Gross Profit = Sales - COGS
     const grossProfit = totalSales - totalCogs;
     
-    // 5. Net Profit (EGP) = Gross Profit - Shipping - Packaging - Expenses
-    const netProfit = grossProfit - totalSalesShipping - totalSalesPackaging - totalExpenses;
+    // 5. Total Costs = COGS + Packaging + Actual Shipping + Distributor Profit + Rep Commissions + Discounts + Expenses
+    const totalCosts = totalCogs + totalSalesPackaging + totalSalesShippingActual + totalDistributorProfit + totalRepCommissions + totalSalesDiscounts + totalExpenses;
     
-    // 6. Total Purchases (EGP) - all purchase ledger entries
+    // 6. Net Profit = Sales - Total Costs
+    const netProfit = totalSales - totalCosts;
+    
+    // 7. Total Purchases (EGP)
     const totalPurchases = purchases.reduce((acc, p) => acc + (parseFloat(p.purchase_cost) * parseInt(p.quantity, 10)), 0);
     const totalPurchasesShipping = purchases.reduce((acc, p) => acc + (parseFloat(p.shipping_cost) || 0), 0);
     
-    // 7. Inventory Value = current stock * product purchase cost
+    // 8. Inventory Value = current stock * product purchase cost
     const inventoryValue = products.reduce((acc, p) => acc + ((p.stock || 0) * (p.purchase_cost || p.costEGP || 0)), 0);
 
-    // 8. Order Status counts
+    // 9. Order Status counts
     const pendingOrdersCount = orders.filter(o => o.status === "pending").length;
     const completedOrdersCount = completedOrders.length;
     
-    // 9. Low stock alert list (stock < 5)
+    // 10. Low stock alert list (stock < 5)
     const lowStockProducts = products.filter(p => (p.stock || 0) < 5);
+
+    // 11. Shipping Profit/Loss
+    const shippingGainLoss = totalSalesShippingEstimated - totalSalesShippingActual;
 
     return {
       totalSales,
       totalPurchases: totalPurchases + totalPurchasesShipping,
       grossProfit,
+      totalCosts,
       netProfit,
-      totalSalesShipping,
+      totalSalesShippingEstimated,
+      totalSalesShippingActual,
+      shippingGainLoss,
+      totalSalesPackaging,
+      totalDistributorProfit,
+      totalRepCommissions,
+      totalSalesDiscounts,
       inventoryValue,
       ordersCount: orders.length,
       productsCount: products.length,
@@ -77,7 +116,7 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
       completedOrdersCount,
       lowStockProducts
     };
-  }, [products, orders, purchases, expenses]);
+  }, [products, orders, purchases, expenses, representatives]);
 
   // --- CHART DATA COMPILATION ---
   // Last 6 months trends
@@ -105,21 +144,39 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
       if (match) {
         match.sales += (o.totalEGP || 0);
         
-        // Calculate estimated order net profit
         let oCogs = 0;
         let oPackaging = 0;
+        let oDistProfit = 0;
         (o.items || []).forEach(item => {
           oCogs += parseFloat(item.product?.purchase_cost || item.product?.costEGP || 0) * parseInt(item.quantity || 1, 10);
           oPackaging += parseFloat(item.product?.packaging_cost || 0) * parseInt(item.quantity || 1, 10);
+          oDistProfit += parseFloat(item.product?.distributor_profit || 0) * parseInt(item.quantity || 1, 10);
         });
-        const oShipping = parseFloat(o.shipping_cost_egp || 0);
-        const oNetProfit = (o.totalEGP || 0) - oCogs - oShipping - oPackaging;
+
+        const estShip = parseFloat(o.estimated_shipping_cost_egp || o.shipping_cost_egp || 0);
+        const actShip = parseFloat(o.actual_shipping_cost_egp || estShip);
+        const disc = parseFloat(o.discount_amount || o.discountAmount || 0);
+
+        let oRepCommission = 0;
+        if (o.representative_id) {
+          const rep = representatives.find(r => r.id === o.representative_id);
+          if (rep) {
+            if (rep.commission_type === 'percentage') {
+              oRepCommission = (o.totalEGP || 0) * (parseFloat(rep.commission_value || 0) / 100);
+            } else {
+              oRepCommission = parseFloat(rep.commission_value || 0);
+            }
+          }
+        }
+
+        const oTotalCost = oCogs + oPackaging + actShip + oDistProfit + oRepCommission + disc;
+        const oNetProfit = (o.totalEGP || 0) - oTotalCost;
         match.profit += oNetProfit;
       }
     });
 
     return months;
-  }, [orders]);
+  }, [orders, representatives]);
 
   // SVG Chart Dimensions & Computations
   const chartWidth = 500;
@@ -140,25 +197,13 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
   }).join(" ");
 
   return (
-    <div className="space-y-6 font-sans">
-      {/* 1. Header Row */}
-      <div className="flex justify-between items-center border-b border-primary/5 pb-4">
-        <div>
-          <h3 className="text-xs font-bold uppercase tracking-wider text-brand-text/80">
-            {language === "ar" ? "لوحة التحكم المالية" : "ERP Accounting & Analytics"}
-          </h3>
-          <p className="text-[10px] text-brand-text/50 mt-1">
-            Realtime database ledger and inventory valuations
-          </p>
-        </div>
-      </div>
-
-      {/* 2. Key Accounting KPIs Grid */}
-      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+    <div className="space-y-6">
+      {/* 1. Header Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
         {/* KPI: Sales */}
         <div className="p-5 rounded-2xl border border-primary/5 bg-brand-bg/20 flex items-center justify-between shadow-sm">
           <div className="space-y-1">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-brand-text/45">Total Sales</span>
+            <span className="text-[9px] uppercase font-bold tracking-wider text-brand-text/45">Gross Revenue</span>
             <div className="text-base font-extrabold text-primary dark:text-secondary font-english">
               {stats.totalSales.toLocaleString()} EGP
             </div>
@@ -167,21 +212,21 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
             </p>
           </div>
           <div className="p-2.5 bg-primary/5 rounded-xl text-primary">
-            <DollarSign className="w-5 h-5" />
+            <ShoppingBag className="w-5 h-5" />
           </div>
         </div>
 
-        {/* KPI: Gross Profit */}
+        {/* KPI: Total Costs */}
         <div className="p-5 rounded-2xl border border-primary/5 bg-brand-bg/20 flex items-center justify-between shadow-sm">
           <div className="space-y-1">
-            <span className="text-[9px] uppercase font-bold tracking-wider text-brand-text/45">Gross Profit</span>
+            <span className="text-[9px] uppercase font-bold tracking-wider text-brand-text/45">Total Costs</span>
             <div className="text-base font-extrabold text-primary dark:text-secondary font-english">
-              {stats.grossProfit.toLocaleString()} EGP
+              {stats.totalCosts.toLocaleString()} EGP
             </div>
-            <p className="text-[8px] text-brand-text/50 font-medium">Sales - Product Costs</p>
+            <p className="text-[8px] text-brand-text/50 font-medium">COGS + Shipping + Expenses</p>
           </div>
-          <div className="p-2.5 bg-green-500/5 rounded-xl text-green-500">
-            <TrendingUp className="w-5 h-5" />
+          <div className="p-2.5 bg-rose-500/5 rounded-xl text-rose-500">
+            <TrendingDown className="w-5 h-5" />
           </div>
         </div>
 
@@ -192,7 +237,7 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
             <div className={`text-base font-extrabold font-english ${stats.netProfit >= 0 ? 'text-green-500' : 'text-red-500'}`}>
               {stats.netProfit.toLocaleString()} EGP
             </div>
-            <p className="text-[8px] text-brand-text/50 font-medium">Profit - Shipping & Expenses</p>
+            <p className="text-[8px] text-brand-text/50 font-medium">Revenue - All Costs</p>
           </div>
           <div className={`p-2.5 rounded-xl ${stats.netProfit >= 0 ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
             {stats.netProfit >= 0 ? <TrendingUp className="w-5 h-5" /> : <TrendingDown className="w-5 h-5" />}
@@ -218,11 +263,25 @@ export const ErpDashboard = ({ products, orders, purchases, expenses, language =
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 text-center">
         <div className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10">
           <span className="text-[8px] uppercase tracking-wider font-bold text-brand-text/40 block">Purchases</span>
-          <span className="text-xs font-bold text-brand-text dark:text-brand-dark-text mt-1 block font-english">{stats.totalPurchases.toLocaleString()} EGP</span>
+          <span className="text-xs font-bold font-english text-brand-text dark:text-brand-dark-text">{stats.totalPurchases.toLocaleString()} EGP</span>
         </div>
         <div className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10">
-          <span className="text-[8px] uppercase tracking-wider font-bold text-brand-text/40 block">Sales Shipping</span>
-          <span className="text-xs font-bold text-brand-text dark:text-brand-dark-text mt-1 block font-english">{stats.totalSalesShipping.toLocaleString()} EGP</span>
+          <span className="text-[8px] uppercase tracking-wider font-bold text-brand-text/40 block">Expenses</span>
+          <span className="text-xs font-bold font-english text-brand-text dark:text-brand-dark-text">{expenses.reduce((acc, e) => acc + (parseFloat(e.amount) || 0), 0).toLocaleString()} EGP</span>
+        </div>
+        <div className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10">
+          <span className="text-[8px] uppercase tracking-wider font-bold text-brand-text/40 block">Rep Commissions</span>
+          <span className="text-xs font-bold font-english text-brand-text dark:text-brand-dark-text">{stats.totalRepCommissions.toLocaleString()} EGP</span>
+        </div>
+        <div className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10">
+          <span className="text-[8px] uppercase tracking-wider font-bold text-brand-text/40 block">Distributor Margin</span>
+          <span className="text-xs font-bold font-english text-brand-text dark:text-brand-dark-text">{stats.totalDistributorProfit.toLocaleString()} EGP</span>
+        </div>
+        <div className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10">
+          <span className="text-[8px] uppercase tracking-wider font-bold text-brand-text/40 block">Shipping Bal (Diff)</span>
+          <span className={`text-xs font-bold font-english ${stats.shippingGainLoss >= 0 ? 'text-green-500' : 'text-red-500'}`}>
+            {stats.shippingGainLoss >= 0 ? '+' : ''}{stats.shippingGainLoss.toLocaleString()} EGP
+          </span>
         </div>
         <div className="p-4 rounded-xl border border-primary/5 bg-brand-bg/10">
           <span className="text-[8px] uppercase tracking-wider font-bold text-brand-text/40 block">Total Orders</span>
